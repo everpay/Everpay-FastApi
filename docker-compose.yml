@@ -1,0 +1,74 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+    volumes:
+      - redis_data:/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build: .
+    image: everpay-api:staging
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL in .env}
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  worker:
+    build: .
+    image: everpay-api:staging
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL in .env}
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=INFO", "--queues=default,health", "--concurrency=2", "--hostname=everpay-worker@%h"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [backend]
+    stop_grace_period: 60s
+
+  beat:
+    build: .
+    image: everpay-api:staging
+    restart: unless-stopped
+    profiles: ["scheduler"]
+    env_file: .env
+    environment:
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL in .env}
+    command: ["celery", "-A", "app.celery_app:celery_app", "beat", "--loglevel=INFO", "--schedule=/var/lib/celery/celerybeat-schedule"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - celery_beat_data:/var/lib/celery
+    networks: [backend]
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  redis_data:
+  celery_beat_data:
