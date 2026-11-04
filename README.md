@@ -1,35 +1,20 @@
-# FastAPI Starter
+# Everpay FastAPI + Celery foundation
 
-A minimal and ready-to-use [FastAPI](https://fastapi.tiangolo.com/) REST API template for rapid project setup.
+Initial deployable foundation for Everpay:
+- FastAPI liveness and readiness endpoints
+- Celery task processing with Redis as broker
+- Dockerfile and Docker Compose
+- Non-root application container
+- Redis health check and isolated internal network
+- Deployment guidance for DigitalOcean staging and AWS Ireland
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/fastapi-1?referralCode=asepsp&utm_medium=integration&utm_source=template&utm_campaign=generic)
+This repository began as a minimal FastAPI starter. This branch adds the deployment foundation and a worker smoke-test task. It does not yet implement Everpay's financial ledger, CockroachDB repositories, transactional outbox, payment orchestration, processor adapters, webhook signature verification, KYC/KYB, VGS or Supabase integration. Do not use it for live payment traffic or cardholder data.
 
-![static-site](preview.png)
+See docs/DEPLOYMENT.md for the deployment and security runbook.
 
-## ✨ Features
+## Local run
 
-- FastAPI
-- [Hypercorn](https://hypercorn.readthedocs.io/)
-- Python 3
-
-## 💁‍♀️ How to use
-
-Clone this repository and install the required packages:
-```bash
-pip install -r requirements.txt
-```
-Run the server locally:
-```bash
-hypercorn main:app --reload
-```
-
-Open your browser and access:
-- API: http://localhost:8000
-- OpenAPI Documentation (Swagger UI): http://localhost:8000/docs
-- Redoc Documentation: http://localhost:8000/redoc
-
-## 📝 Notes
-
-- To learn about how to use FastAPI with most of its features, you can visit the [FastAPI Documentation](https://fastapi.tiangolo.com/tutorial/)
-- To learn about Hypercorn and how to configure it, read their [Documentation](https://hypercorn.readthedocs.io/)
-
+1. Copy .env.example to .env and set a unique Redis password.
+2. Start with docker compose up -d --build.
+3. Check http://127.0.0.1:8000/health/live and /health/ready.
+4. Review worker logs with docker compose logs -f worker.
