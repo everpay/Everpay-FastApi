@@ -20,9 +20,9 @@ CockroachDB is intentionally external to Compose. Provision separate staging and
 ## Configure and start
 
 1. Copy .env.example to .env.
-2. Generate a unique long Redis password and set it in REDIS_PASSWORD and in the password portion of REDIS_URL.
+2. Generate a unique long Redis password and set it in REDIS_PASSWORD and in the password portion of REDIS_URL. Configure DATABASE_URL with the dedicated staging SQL user, the staging database, and sslmode=verify-full. URL-encode the SQL password if it contains reserved URI characters.
 3. Set APP_ENV=staging.
-4. Keep .env out of Git and restrict it to the deployment account.
+4. Keep .env out of Git and restrict it to the deployment account. Synchronize it with the private workspace record under secrets/.env.fastapi-staging; never put the cloud-console login in DATABASE_URL.
 5. Start: docker compose up -d --build
 6. Inspect: docker compose ps
 7. Logs: docker compose logs --tail=100 api worker redis
@@ -33,10 +33,32 @@ API binds to 127.0.0.1:8000. Put Nginx or Caddy in front for HTTPS; do not expos
 
 - curl -fsS http://127.0.0.1:8000/health/live
 - curl -fsS http://127.0.0.1:8000/health/ready
+- docker compose run --rm --no-deps api python scripts/check_database.py
 - docker compose exec worker celery -A app.celery_app:celery_app inspect ping
 - docker compose exec worker celery -A app.celery_app:celery_app call app.tasks.health.worker_health
 
 The Celery task is a smoke test only and has no financial side effects.
+
+The API maintains a small Psycopg connection pool to CockroachDB Cloud. TLS
+hostname and certificate verification are mandatory. Public CA roots come from
+certifi; an explicit `sslrootcert` in DATABASE_URL can select a mounted private
+CA instead. Do not use `sslmode=require` or disable certificate verification.
+Database outages return a generic HTTP 503 from readiness without returning the
+connection string. Liveness does not require Redis or CockroachDB.
+
+Use an application SQL user without the `admin` role, with CONNECT on the
+staging database and USAGE on its public schema. No ledger tables or write
+permissions are needed for the connection check. Future schema migrations and
+DML grants require their own reviewed changes. The cloud console grants new SQL
+users admin by default; remove that role before storing the credential in an app.
+If a network allowlist is needed, allow only the intended staging source IPs.
+Do not open the cluster to all IP addresses to make a connection test pass.
+
+For local code validation without Docker, create an isolated virtual environment,
+install requirements-dev.txt and run `python -m pytest`. From the repository root,
+`python scripts/check_database.py` checks the actual SQL login using `.env` and
+read-only queries. On Windows the script selects the event loop required by
+Psycopg. This direct check does not replace a Docker Compose deployment test.
 
 ## Scheduler
 
@@ -92,7 +114,7 @@ Cloud-provider infrastructure compliance does not certify Everpay's application.
 
 ## Next engineering increments
 
-1. CockroachDB connectivity and Alembic migrations after confirming the supported driver strategy.
+1. Alembic migrations and database repositories (the TLS connection pool and readiness check are implemented).
 2. Durable payment state and transactional outbox.
 3. Outbox dispatcher and idempotent Celery task base.
 4. Processor adapters and signed webhook ingestion.
