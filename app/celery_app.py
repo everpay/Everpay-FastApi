@@ -2,7 +2,7 @@ from celery import Celery
 from app.config import get_settings
 
 settings = get_settings()
-celery_app = Celery("everpay", broker=settings.redis_url, include=["app.tasks.health"])
+celery_app = Celery("everpay", broker=settings.redis_url, include=["app.tasks.health", "app.tasks.fraud_graph"])
 celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
@@ -19,5 +19,8 @@ celery_app.conf.update(
     task_soft_time_limit=50,
     task_time_limit=60,
     task_default_queue="default",
-    task_routes={"app.tasks.health.worker_health": {"queue": "health"}},
+    task_routes={
+        "app.tasks.health.worker_health": {"queue": "health"},
+        "app.tasks.fraud_graph.record_event": {"queue": "fraud_graph"},
+    },
 )

@@ -1,0 +1,573 @@
+{
+ "spec": "v1",
+ "message": "v1|<kind>|<canonical>",
+ "key": "everpay-fraud-graph-test-vector-key-0001",
+ "cases": [
+  {
+   "kind": "email",
+   "input": "  Jane.Doe@Example.COM ",
+   "canonical": "jane.doe@example.com",
+   "hint": "j***@example.com",
+   "attributes": {},
+   "fingerprint": "43d894c95bcff89762376d2a8b0dca857446cd1d742599d8139df427e0815990"
+  },
+  {
+   "kind": "email",
+   "input": "ÉLODIE@exemple.fr",
+   "canonical": "élodie@exemple.fr",
+   "hint": "é***@exemple.fr",
+   "attributes": {},
+   "fingerprint": "aa01e2445ece4cc922da7b2baf7993c3b09ec90845dba06a395a959ae698e6d2"
+  },
+  {
+   "kind": "email",
+   "input": "bad-email",
+   "canonical": null,
+   "note": "no @"
+  },
+  {
+   "kind": "email",
+   "input": "a@b",
+   "canonical": null,
+   "note": "domain without a dot"
+  },
+  {
+   "kind": "email",
+   "input": "x@@y.com",
+   "canonical": null,
+   "note": "two @"
+  },
+  {
+   "kind": "email",
+   "input": "jo hn@x.com",
+   "canonical": null,
+   "note": "whitespace"
+  },
+  {
+   "kind": "phone",
+   "input": "+1 (416) 555-0199",
+   "canonical": "14165550199",
+   "hint": "••0199",
+   "attributes": {},
+   "fingerprint": "79eef074d30aeb53ad9ee22c5256e26b5e7619a88b37eb524608375b22a34205"
+  },
+  {
+   "kind": "phone",
+   "input": "12345",
+   "canonical": null,
+   "note": "too short"
+  },
+  {
+   "kind": "ip",
+   "input": " 8.8.8.8 ",
+   "canonical": "8.8.8.8",
+   "hint": "8.8.8.x",
+   "attributes": {
+    "family": "ipv4"
+   },
+   "fingerprint": "a4ed4b80419f9f6eeb6089dd224fa8e44ebdd9426ab8e4c9aabba86ab6cabb0d"
+  },
+  {
+   "kind": "ip",
+   "input": "203.0.113.7",
+   "canonical": "203.0.113.7",
+   "hint": "203.0.113.x",
+   "attributes": {
+    "family": "ipv4"
+   },
+   "fingerprint": "c017556b16414c3d01bc0725fe96d5d666dc1edc9f56aba3ba33dfc8c7ae69f0"
+  },
+  {
+   "kind": "ip",
+   "input": "10.1.2.3",
+   "canonical": null,
+   "note": "private"
+  },
+  {
+   "kind": "ip",
+   "input": "192.168.0.1",
+   "canonical": null,
+   "note": "private"
+  },
+  {
+   "kind": "ip",
+   "input": "172.20.0.1",
+   "canonical": null,
+   "note": "private"
+  },
+  {
+   "kind": "ip",
+   "input": "100.64.0.1",
+   "canonical": null,
+   "note": "carrier-grade NAT"
+  },
+  {
+   "kind": "ip",
+   "input": "127.0.0.1",
+   "canonical": null,
+   "note": "loopback"
+  },
+  {
+   "kind": "ip",
+   "input": "169.254.1.1",
+   "canonical": null,
+   "note": "link local"
+  },
+  {
+   "kind": "ip",
+   "input": "224.0.0.1",
+   "canonical": null,
+   "note": "multicast"
+  },
+  {
+   "kind": "ip",
+   "input": "010.1.1.1",
+   "canonical": null,
+   "note": "leading zero"
+  },
+  {
+   "kind": "ip",
+   "input": "256.1.1.1",
+   "canonical": null,
+   "note": "octet out of range"
+  },
+  {
+   "kind": "ip",
+   "input": "2001:db8::1",
+   "canonical": "2001:0db8:0000:0000::/64",
+   "hint": "2001:0db8…/64",
+   "attributes": {
+    "family": "ipv6"
+   },
+   "fingerprint": "2426b8d3388da224194434401308e2083721f26950389d4641dbe6aedfc5e5c8"
+  },
+  {
+   "kind": "ip",
+   "input": "2001:DB8:0:0:1::5%eth0",
+   "canonical": "2001:0db8:0000:0000::/64",
+   "hint": "2001:0db8…/64",
+   "attributes": {
+    "family": "ipv6"
+   },
+   "fingerprint": "2426b8d3388da224194434401308e2083721f26950389d4641dbe6aedfc5e5c8"
+  },
+  {
+   "kind": "ip",
+   "input": "2606:4700:4700::1111",
+   "canonical": "2606:4700:4700:0000::/64",
+   "hint": "2606:4700…/64",
+   "attributes": {
+    "family": "ipv6"
+   },
+   "fingerprint": "737fb66db51a5fcbad3ad4426afaf1a078aab25107046a39bddfd3946da2d71c"
+  },
+  {
+   "kind": "ip",
+   "input": "::ffff:198.51.100.4",
+   "canonical": "198.51.100.4",
+   "hint": "198.51.100.x",
+   "attributes": {
+    "family": "ipv4"
+   },
+   "fingerprint": "bcf8ca42d02fb07ac73a94d76f9ab138b3765697df2c83b53c97996918453313"
+  },
+  {
+   "kind": "ip",
+   "input": "::ffff:10.0.0.1",
+   "canonical": null,
+   "note": "mapped private"
+  },
+  {
+   "kind": "ip",
+   "input": "fe80::1",
+   "canonical": null,
+   "note": "link local"
+  },
+  {
+   "kind": "ip",
+   "input": "::1",
+   "canonical": null,
+   "note": "loopback"
+  },
+  {
+   "kind": "ip",
+   "input": "::",
+   "canonical": null,
+   "note": "unspecified"
+  },
+  {
+   "kind": "ip",
+   "input": "fd00::1",
+   "canonical": null,
+   "note": "unique local"
+  },
+  {
+   "kind": "ip",
+   "input": "ff02::1",
+   "canonical": null,
+   "note": "multicast"
+  },
+  {
+   "kind": "ip",
+   "input": "1:2:3:4:5:6:7::8",
+   "canonical": null,
+   "note": ":: standing for zero groups"
+  },
+  {
+   "kind": "ip",
+   "input": "2001:db8::1::2",
+   "canonical": null,
+   "note": "two ::"
+  },
+  {
+   "kind": "ip",
+   "input": "2001:db8:12345::1",
+   "canonical": null,
+   "note": "hextet too long"
+  },
+  {
+   "kind": "ip",
+   "input": "",
+   "canonical": null,
+   "note": "empty"
+  },
+  {
+   "kind": "device",
+   "input": "  fp_8c1a2b3c4d5e  ",
+   "canonical": "fp_8c1a2b3c4d5e",
+   "hint": "fp_8c1…",
+   "attributes": {},
+   "fingerprint": "82605570e8564d6a294fdd454161368d7b44b74c8b1380989d218696b9a56ad8"
+  },
+  {
+   "kind": "device",
+   "input": "short",
+   "canonical": null,
+   "note": "too short"
+  },
+  {
+   "kind": "card",
+   "input": "4111 1111 1111 1111",
+   "canonical": "4111111111111111",
+   "hint": "411111••1111",
+   "attributes": {
+    "bin": "411111",
+    "last4": "1111"
+   },
+   "fingerprint": "cc80430378448dd46c70eeb33f3e66180c0586cfe6aae89c6cade0e9679c2a78"
+  },
+  {
+   "kind": "card",
+   "input": "5555-5555-5555-4444",
+   "canonical": "5555555555554444",
+   "hint": "555555••4444",
+   "attributes": {
+    "bin": "555555",
+    "last4": "4444"
+   },
+   "fingerprint": "c3cdcb0944385937cf6dd366a51f76dbca90412bb89d7b74729a1dc582eaada0"
+  },
+  {
+   "kind": "card",
+   "input": "4111111111111112",
+   "canonical": null,
+   "note": "fails Luhn"
+  },
+  {
+   "kind": "card",
+   "input": "4111x1111111111",
+   "canonical": null,
+   "note": "letters"
+  },
+  {
+   "kind": "card_token",
+   "input": {
+    "provider": "VGS",
+    "token": "tok_sandbox_abc123",
+    "last4": "4242"
+   },
+   "canonical": "vgs:tok_sandbox_abc123",
+   "hint": "••4242",
+   "attributes": {
+    "provider": "vgs",
+    "last4": "4242"
+   },
+   "fingerprint": "7e63a86df4974592914d045e4e1415ab70f9820047459dfa27361e8e7f852cf0"
+  },
+  {
+   "kind": "card_token",
+   "input": {
+    "provider": "vgs",
+    "token": "tok_sandbox_abc123"
+   },
+   "canonical": "vgs:tok_sandbox_abc123",
+   "hint": "vgs token",
+   "attributes": {
+    "provider": "vgs"
+   },
+   "fingerprint": "7e63a86df4974592914d045e4e1415ab70f9820047459dfa27361e8e7f852cf0"
+  },
+  {
+   "kind": "card_token",
+   "input": {
+    "provider": "v",
+    "token": "tok_sandbox_abc123"
+   },
+   "canonical": null,
+   "note": "provider too short"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "iban": "GB82 WEST 1234 5698 7654 32"
+   },
+   "canonical": "iban:GB82WEST12345698765432",
+   "hint": "GB ••5432",
+   "attributes": {
+    "country": "GB"
+   },
+   "fingerprint": "1bb8a330a349861563b69dfc26a4aadce03895fbd9bff351be6c86a1e232fdd8"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "iban": "GB82WEST12345698765431"
+   },
+   "canonical": null,
+   "note": "IBAN checksum"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "clabe": "032180000118359719"
+   },
+   "canonical": "clabe:032180000118359719",
+   "hint": "MX ••9719",
+   "attributes": {
+    "country": "MX"
+   },
+   "fingerprint": "5554b2bf600db8dcc206ab00e28457baf1be9ba0906ad32f1f1655235c088c02"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "clabe": "032180000118359718"
+   },
+   "canonical": null,
+   "note": "CLABE check digit"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "routing_number": "021000021",
+    "account_number": "000123456789"
+   },
+   "canonical": "us:021000021:000123456789",
+   "hint": "US ••6789",
+   "attributes": {
+    "country": "US",
+    "routing": "021000021"
+   },
+   "fingerprint": "9e36b33d9a29163473ba6cc1e0262249652db84041dfa5e25a8a23abb7411e06"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "institution_number": "3",
+    "transit_number": "12345",
+    "account_number": "1234567"
+   },
+   "canonical": "ca:003:12345:1234567",
+   "hint": "CA ••4567",
+   "attributes": {
+    "country": "CA",
+    "institution": "003"
+   },
+   "fingerprint": "479351bd7a361429c166ce9bbf9d195fda8e5d43d2884d44d2da7287c76d41b3"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "routing_number": "000312345",
+    "account_number": "1234567",
+    "country": "ca"
+   },
+   "canonical": "ca:003:12345:1234567",
+   "hint": "CA ••4567",
+   "attributes": {
+    "country": "CA",
+    "institution": "003"
+   },
+   "fingerprint": "479351bd7a361429c166ce9bbf9d195fda8e5d43d2884d44d2da7287c76d41b3"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "routing_number": "012345678",
+    "account_number": "1234567"
+   },
+   "canonical": "ca:123:45678:1234567",
+   "hint": "CA ••4567",
+   "attributes": {
+    "country": "CA",
+    "institution": "123"
+   },
+   "fingerprint": "7c82dfbf70daff5675f66e755a33503ef43e2e2a97e21a551362d368b5089939"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "routing_number": "123456789",
+    "account_number": "1234"
+   },
+   "canonical": null,
+   "note": "not ABA, not Canadian"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "institution_number": "1234",
+    "transit_number": "12345",
+    "account_number": "1234567"
+   },
+   "canonical": null,
+   "note": "institution too long"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "sort_code": "20-00-00",
+    "account_number": "55779911"
+   },
+   "canonical": "gb:200000:55779911",
+   "hint": "GB ••9911",
+   "attributes": {
+    "country": "GB"
+   },
+   "fingerprint": "83d38a23fd10dd6c30fb424579e13d9e08ff6c0aa6bbf3f1934ea55bdeadab45"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "bsb": "062-000",
+    "account_number": "12345678"
+   },
+   "canonical": "au:062000:12345678",
+   "hint": "AU ••5678",
+   "attributes": {
+    "country": "AU"
+   },
+   "fingerprint": "d5841238870ee250ed7d2c5f22273a60bc47cbdf0a364b91564674316df0d68f"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "ifsc": "hdfc0001234",
+    "account_number": "50100012345678"
+   },
+   "canonical": "in:HDFC0001234:50100012345678",
+   "hint": "IN ••5678",
+   "attributes": {
+    "country": "IN"
+   },
+   "fingerprint": "2f1cc44f7c5a29eac25b70e5b1951051f2439b16809336420117eddfe3524279"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "swift_bic": "DEUTDEFF500",
+    "account_number": "0123-4567.89"
+   },
+   "canonical": "swift:DEUTDEFF:0123456789",
+   "hint": "DE ••6789",
+   "attributes": {
+    "country": "DE",
+    "bic": "DEUTDEFF"
+   },
+   "fingerprint": "9941d1bf2643fd71f824aa54921213f7ee7b26cbe5c17a1b71246bbf0c678ed6"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "account_number": "12345678"
+   },
+   "canonical": null,
+   "note": "no bank identifier"
+  },
+  {
+   "kind": "bank_account",
+   "input": {
+    "routing_number": "021000021",
+    "account_number": "12"
+   },
+   "canonical": null,
+   "note": "account too short"
+  },
+  {
+   "kind": "crypto_wallet",
+   "input": {
+    "network": "polygon",
+    "address": "0xAbC0000000000000000000000000000000000001"
+   },
+   "canonical": "evm:0xabc0000000000000000000000000000000000001",
+   "hint": "0xabc0…0001",
+   "attributes": {
+    "network": "evm"
+   },
+   "fingerprint": "f88031589e97cb4fb72a69e522b7bd0a344421c422bcfc4c4685a5583b77cb73"
+  },
+  {
+   "kind": "crypto_wallet",
+   "input": {
+    "network": "Bitcoin",
+    "address": "BC1QAR0SRRR7XFKVY5L643LYDNW9RE59GTZZWF5MDQ"
+   },
+   "canonical": "bitcoin:bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+   "hint": "bc1qar…5mdq",
+   "attributes": {
+    "network": "bitcoin"
+   },
+   "fingerprint": "4c6244af544be0592a49c715ff614a9b30a33c34cfed5f19b819483fdafe87f8"
+  },
+  {
+   "kind": "crypto_wallet",
+   "input": {
+    "network": "tron",
+    "address": "TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE"
+   },
+   "canonical": "tron:TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE",
+   "hint": "TQn9Y2…bLSE",
+   "attributes": {
+    "network": "tron"
+   },
+   "fingerprint": "b6d3110f3f45a898bb817970a54bce69f07d1d61f6157c874cb02225f5735e75"
+  },
+  {
+   "kind": "crypto_wallet",
+   "input": {
+    "address": "TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE"
+   },
+   "canonical": null,
+   "note": "no network"
+  }
+ ],
+ "rails": {
+  "card": "card",
+  "Apple Pay": "card",
+  "ach_bank": "ach",
+  "plaid": "ach",
+  "dcbank": "eft",
+  "sepa": "sepa",
+  "bank_transfer": "wire",
+  "remittance": "wire",
+  "interac": "interac",
+  "e-transfer": "interac",
+  "crypto": "crypto",
+  "usdt": "crypto",
+  "openbanking": "open_banking",
+  "pix": "open_banking",
+  "paypal": "wallet",
+  "boleto": "other",
+  "": "other"
+ }
+}
