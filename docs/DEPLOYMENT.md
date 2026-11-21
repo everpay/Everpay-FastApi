@@ -6,6 +6,8 @@ This branch adds a first deployable foundation: FastAPI, Celery, Redis broker, D
 
 This is not the complete Everpay payment backend. It does not yet implement the financial ledger, CockroachDB repositories, transactional outbox, processor adapters, payment authorization, webhook verification, KYC/KYB, VGS integration, Supabase integration, TLS ingress, backups or PCI validation. Do not connect real cardholder data or production payment credentials to this foundation.
 
+The optional fraud graph writer (`app/fraud_graph`, queue `fraud_graph`) connects to Supabase Postgres with a write-only login; see `docs/FRAUD_GRAPH.md`.
+
 CockroachDB is intentionally external to Compose. Provision separate staging and production clusters/databases with TLS and backups. Never run a single-node insecure CockroachDB container on a public server.
 
 ## Server baseline

@@ -44,7 +44,7 @@ services:
     environment:
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL in .env}
       DATABASE_URL: ${DATABASE_URL:?Set the staging DATABASE_URL in .env}
-    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=INFO", "--queues=default,health", "--concurrency=2", "--hostname=everpay-worker@%h"]
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=INFO", "--queues=default,health,fraud_graph", "--concurrency=2", "--hostname=everpay-worker@%h"]
     depends_on:
       redis:
         condition: service_healthy
