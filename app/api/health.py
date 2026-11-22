@@ -33,5 +33,9 @@ async def readiness():
             checks["redis"] = "unavailable"
     else:
         checks["redis"] = "not_configured"
-    ready = all(value in ("ok", "not_configured") for value in checks.values())
+
+    if settings.app_env in ("staging", "production"):
+        ready = checks.get("cockroachdb") == "ok" and checks.get("redis") == "ok"
+    else:
+        ready = all(value in ("ok", "not_configured") for value in checks.values())
     return JSONResponse(status_code=200 if ready else 503, content={"status": "ready" if ready else "not_ready", "checks": checks})
