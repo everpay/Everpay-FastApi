@@ -1,6 +1,6 @@
 from typing import Any
 import httpx
-from app.core.config import settings
+from app.integrations.didit.config import didit_settings
 
 class DiditAPIError(Exception):
     def __init__(self, status_code: int, detail: str):
@@ -10,10 +10,10 @@ class DiditAPIError(Exception):
 
 class DiditClient:
     def __init__(self) -> None:
-        if not settings.didit_api_key:
+        if not didit_settings.didit_api_key:
             raise RuntimeError("DIDIT_API_KEY is not configured")
-        self.base_url = settings.didit_base_url.rstrip("/")
-        self.timeout = settings.didit_timeout_seconds
+        self.base_url = didit_settings.didit_base_url.rstrip("/")
+        self.timeout = didit_settings.didit_timeout_seconds
         self.api_key = settings.didit_api_key
 
     async def _request(self, method: str, path: str, *, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -46,6 +46,6 @@ class DiditClient:
     async def create_sdk_token(self, vendor_data: str) -> dict[str, Any]:
         return await self._request("POST", "/v3/transactions/sdk-token/", payload={
             "vendor_data": vendor_data,
-            "ttl_seconds": settings.didit_sdk_token_ttl_seconds,
+            "ttl_seconds": didit_settings.didit_sdk_token_ttl_seconds,
             "max_uses": 1,
         })
