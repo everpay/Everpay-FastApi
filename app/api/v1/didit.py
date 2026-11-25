@@ -94,7 +94,7 @@ def verify_didit_signature(event: dict[str, Any], signature: str, secret: str) -
 
 @router.post("/webhook", include_in_schema=False)
 async def didit_webhook(request: Request, x_signature_v2: str = Header(default="", alias="X-Signature-V2")):
-    if not didit_didit_settings.didit_webhook_secret:
+    if not didit_settings.didit_webhook_secret:
         raise HTTPException(status_code=503, detail="Didit webhook verification is not configured")
     raw = await request.body()
     if len(raw) > didit_settings.didit_webhook_max_body_bytes:
@@ -105,7 +105,7 @@ async def didit_webhook(request: Request, x_signature_v2: str = Header(default="
         raise HTTPException(status_code=400, detail="Invalid webhook JSON")
     if not isinstance(event, dict):
         raise HTTPException(status_code=400, detail="Invalid webhook payload")
-    if not verify_didit_signature(event, x_signature_v2, settings.didit_webhook_secret):
+    if not verify_didit_signature(event, x_signature_v2, didit_settings.didit_webhook_secret):
         raise HTTPException(status_code=401, detail="Invalid Didit webhook signature")
     timestamp = event.get("timestamp")
     if not isinstance(timestamp, (int, float)) or isinstance(timestamp, bool):
