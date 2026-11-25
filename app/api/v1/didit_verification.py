@@ -38,8 +38,7 @@ async def create_kyc_session(body: DiditKycSessionRequest, user: dict[str, Any] 
     try:
         return await DiditVerificationService().create_session(
             subject_id=_subject_id(user), entity_type="individual",
-            workflow_id=didit_settings.didit_kyc_workflow_id, callback=None,
-            callback_method="completer", language=body.language,
+            workflow_id=didit_settings.didit_kyc_workflow_id, language=body.language,
         )
     except DiditAPIError as exc:
         raise HTTPException(status_code=502, detail="Didit KYC session could not be created; reconcile before retrying") from exc
@@ -56,8 +55,7 @@ async def create_kyb_session(business_id: str, body: DiditKybSessionRequest,
     try:
         return await DiditVerificationService().create_session(
             subject_id=business_id, entity_type="business",
-            workflow_id=didit_settings.didit_kyb_workflow_id, callback=None,
-            callback_method="completer", language=body.language,
+            workflow_id=didit_settings.didit_kyb_workflow_id, language=body.language,
         )
     except DiditAPIError as exc:
         raise HTTPException(status_code=502, detail="Didit KYB session could not be created; reconcile before retrying") from exc
