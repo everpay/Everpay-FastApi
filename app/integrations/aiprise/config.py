@@ -11,6 +11,7 @@ class AiPriseSettings(BaseSettings):
     )
 
     aiprise_api_key: str | None = None
+    aiprise_secondary_fallback_enabled: bool = False
     aiprise_webhook_secret: str | None = None
     aiprise_base_url: str = "https://api-sandbox.aiprise.com/api/v1/verify"
     aiprise_environment: str = "sandbox"
