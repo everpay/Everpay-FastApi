@@ -100,8 +100,8 @@ async def didit_webhook(request: Request, x_signature_v2: str = Header(default="
     if len(raw) > didit_settings.didit_webhook_max_body_bytes:
         raise HTTPException(status_code=413, detail="Webhook payload too large")
     try:
-        event = json.loads(raw)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+        event = json.loads(raw, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(f"Invalid JSON constant: {value}")))
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
         raise HTTPException(status_code=400, detail="Invalid webhook JSON")
     if not isinstance(event, dict):
         raise HTTPException(status_code=400, detail="Invalid webhook payload")
