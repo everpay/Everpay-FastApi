@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends
 from app.core.auth import get_current_user
+from app.api.v1.aiprise import router as aiprise_router
 from app.api.v1.didit import router as didit_router
+from app.api.v1.didit_verification import router as didit_verification_router
 
 router = APIRouter()
 router.include_router(didit_router)
+router.include_router(didit_verification_router)
+router.include_router(aiprise_router)
 
 @router.get("/me", tags=["identity"])
 async def who_am_i(user: dict = Depends(get_current_user)):

@@ -4,7 +4,7 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=(".env", ".env.local"), env_file_encoding="utf-8", extra="ignore")
     app_name: str = "Everpay API"
     app_env: Literal["local", "test", "staging", "production"] = "local"
     api_v1_prefix: str = "/v1"
@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     database_pool_timeout_seconds: int = 10
     supabase_url: str | None = None
     supabase_anon_key: str | None = None
+    supabase_service_role_key: str | None = None
     auth_timeout_seconds: float = 5.0
     redis_url: str | None = None
     celery_task_always_eager: bool = False
