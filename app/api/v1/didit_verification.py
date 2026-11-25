@@ -172,6 +172,8 @@ async def didit_verification_webhook(
     if isinstance(timestamp, str):
         try:
             parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                raise ValueError("Webhook timestamp must include a timezone")
             timestamp_value = parsed.timestamp()
         except ValueError:
             raise HTTPException(status_code=401, detail="Invalid signed webhook timestamp")
