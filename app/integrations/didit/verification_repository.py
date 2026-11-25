@@ -57,7 +57,11 @@ class DiditVerificationRepository:
         warnings = decision.get("warnings") or decision.get("warning_codes") or []
         if not isinstance(warnings, list):
             warnings = [str(warnings)]
-        warnings = [str(x)[:120] for x in warnings[:50]]
+        warnings = [
+            str(x.get("code") or x.get("warning_code") or x.get("tag") or "UNSPECIFIED")[:120]
+            if isinstance(x, dict) else str(x)[:120]
+            for x in warnings[:50]
+        ]
         summary = {
             "session_kind": decision.get("session_kind"),
             "status": status,
@@ -127,9 +131,23 @@ class DiditVerificationRepository:
 
 
 def _feature_statuses(decision: dict[str, Any]) -> dict[str, str]:
-    fields = ("kyc", "aml", "kyb_registry", "kyb_company_aml", "kyb_documents", "kyb_key_people")
-    return {
-        key: str(decision[key].get("status"))[:40]
-        for key in fields
-        if isinstance(decision.get(key), dict) and decision[key].get("status") is not None
-    }
+    result: dict[str, str] = {}
+    # Current Didit KYB decision objects expose per-check arrays.
+    array_fields = ("registry_checks", "key_people_checks", "company_aml_checks", "document_verifications")
+    for field in array_fields:
+        entries = decision.get(field)
+        if isinstance(entries, list):
+            statuses = sorted({
+                str(item.get("status")).upper()[:40]
+                for item in entries
+                if isinstance(item, dict) and item.get("status") is not None
+            })
+            if statuses:
+                result[field] = ",".join(statuses)[:160]
+    # Retain compatibility with the compact legacy feature summary shape.
+    object_fields = ("kyc", "aml", "kyb_registry", "kyb_company_aml", "kyb_documents", "kyb_key_people")
+    for field in object_fields:
+        value = decision.get(field)
+        if isinstance(value, dict) and value.get("status") is not None:
+            result[field] = str(value["status"])[:40]
+    return result
