@@ -34,4 +34,4 @@ CREATE TABLE IF NOT EXISTS didit_webhook_events (
     processed_at TIMESTAMPTZ NULL,
     last_error STRING(1000) NULL
 );
-CREATE INDEX IF NOT EXISTS idx_didit_webhook_events_pending ON didit_webhook_events (received_at) WHERE processing_status = 'PENDING';
+CREATE INDEX IF NOT EXISTS idx_didit_webhook_events_pending ON didit_webhook_events (processing_status, received_at);
