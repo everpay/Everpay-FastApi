@@ -45,8 +45,13 @@ class DiditVerificationRepository:
     async def mark_uncertain(self, case_id: str, reason: str) -> None:
         async with self._engine().begin() as conn:
             await conn.execute(text("""
-                UPDATE didit_verification_cases SET status='RECONCILIATION_REQUIRED',
-                    last_error=:reason, updated_at=now() WHERE case_id=:case_id
+                UPDATE didit_verification_cases
+                SET status=CASE
+                        WHEN didit_session_id IS NULL AND last_event_at IS NULL THEN 'RECONCILIATION_REQUIRED'
+                        ELSE status
+                    END,
+                    last_error=:reason, updated_at=now()
+                WHERE case_id=:case_id
             """), {"case_id": case_id, "reason": reason[:500]})
 
     async def apply_decision(self, session_id: str, decision: dict[str, Any], event_at=None) -> bool:
