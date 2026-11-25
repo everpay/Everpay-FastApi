@@ -35,7 +35,7 @@ class DiditMonitoringService:
 
     async def register_device_transaction(self, transaction_id: str, vendor_data: str,
             transaction_details: TransactionDetails, full_name: str, entity_type: str = "individual",
-            counterparty: Counterparty | None = None, subject_payment_method: PaymentMethod | None = None) -> None:
+            counterparty: Counterparty | None = None, subject_payment_method: PaymentMethod | None = None) -> str:
         subject = Subject(entity_type=entity_type, vendor_data=vendor_data, full_name=full_name,
                           payment_method=subject_payment_method)
         # Reuse the server-lane validator so crypto wallet placement and transaction fields
