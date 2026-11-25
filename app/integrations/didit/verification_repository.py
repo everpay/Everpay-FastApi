@@ -16,16 +16,16 @@ class DiditVerificationRepository:
         return engine
 
     async def reserve_case(self, *, case_id: str, subject_id: str, entity_type: str,
-                           vendor_data: str, workflow_id: str, callback_url: str | None) -> None:
+                           vendor_data: str, workflow_id: str) -> None:
         async with self._engine().begin() as conn:
             await conn.execute(text("""
                 INSERT INTO didit_verification_cases
-                    (case_id, subject_id, entity_type, vendor_data, workflow_id, callback_url,
+                    (case_id, subject_id, entity_type, vendor_data, workflow_id,
                      status, created_at, updated_at)
                 VALUES (:case_id, :subject_id, :entity_type, :vendor_data, :workflow_id,
-                        :callback_url, 'SUBMITTING', now(), now())
+                        'SUBMITTING', now(), now())
             """), {"case_id": case_id, "subject_id": subject_id, "entity_type": entity_type,
-                    "vendor_data": vendor_data, "workflow_id": workflow_id, "callback_url": callback_url})
+                    "vendor_data": vendor_data, "workflow_id": workflow_id})
 
     async def attach_session(self, case_id: str, result: dict[str, Any]) -> None:
         session_id = result.get("session_id")
