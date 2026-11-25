@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS didit_verification_webhook_events (
     event_id STRING(128) PRIMARY KEY,
     event_type STRING(100) NOT NULL,
     didit_session_id STRING(128) NOT NULL,
+    payload JSONB NOT NULL,
+    processing_status STRING(16) NOT NULL CHECK (processing_status IN ('PENDING', 'PROCESSED')),
     received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     processed_at TIMESTAMPTZ NULL
 );
