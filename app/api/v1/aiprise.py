@@ -17,6 +17,8 @@ router = APIRouter(prefix="/compliance", tags=["compliance"])
 
 
 def _service() -> AiPriseService:
+    if not aiprise_settings.aiprise_secondary_fallback_enabled:
+        raise HTTPException(status_code=409, detail="AiPrise is configured as Everpay's secondary provider and is not enabled for fallback. Didit is the primary KYC/KYB provider.")
     try:
         return AiPriseService()
     except RuntimeError as exc:
@@ -183,6 +185,7 @@ async def compliance_provider_status(_: dict[str, Any] = Depends(get_current_use
     return {
         "aiprise": {
             "configured": bool(aiprise_settings.aiprise_api_key),
+            "secondary_fallback_enabled": aiprise_settings.aiprise_secondary_fallback_enabled,
             "environment": aiprise_settings.aiprise_environment,
             "kyc_template_configured": bool(aiprise_settings.aiprise_kyc_template_id),
             "email_template_configured": bool(aiprise_settings.aiprise_email_check_template_id),
