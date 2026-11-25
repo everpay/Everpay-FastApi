@@ -35,9 +35,12 @@ class DiditVerificationRepository:
         async with self._engine().begin() as conn:
             updated = await conn.execute(text("""
                 UPDATE didit_verification_cases
-                SET didit_session_id=:session_id, verification_url=:url,
-                    status='IN_PROGRESS', updated_at=now()
-                WHERE case_id=:case_id AND status='SUBMITTING'
+                SET didit_session_id=COALESCE(didit_session_id, :session_id),
+                    verification_url=:url,
+                    status=CASE WHEN last_event_at IS NULL AND status='SUBMITTING' THEN 'IN_PROGRESS' ELSE status END,
+                    updated_at=now()
+                WHERE case_id=:case_id
+                  AND (didit_session_id IS NULL OR didit_session_id=:session_id)
             """), {"case_id": case_id, "session_id": str(session_id), "url": str(url)})
             if updated.rowcount != 1:
                 raise DiditVerificationRepositoryError("Didit case reservation was not found")
