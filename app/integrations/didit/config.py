@@ -6,6 +6,7 @@ class DiditSettings(BaseSettings):
     didit_api_key: str | None = None
     redis_url: str | None = None
     didit_webhook_secret: str | None = None
+    didit_verification_webhook_secret: str | None = None
     didit_base_url: str = "https://verification.didit.me"
     didit_kyc_workflow_id: str | None = None
     didit_kyb_workflow_id: str | None = None
