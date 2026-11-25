@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS didit_transaction_screenings (
     action_required JSONB NULL,
     provider_response JSONB NULL,
     travel_rule_status STRING(40) NULL,
-    last_event_at TIMESTAMPTZ NULL,
+    last_transaction_event_at TIMESTAMPTZ NULL,
+    last_travel_rule_event_at TIMESTAMPTZ NULL,
     last_error STRING(1000) NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
