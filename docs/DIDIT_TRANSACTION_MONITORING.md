@@ -119,6 +119,10 @@ if (result.actionRequired?.type === "verification_session") {
 
 Important: the SDK token binds vendor_data to the user; it does not cryptographically bind the transaction ID or transaction amount. Therefore, the client SDK result is not sufficient authorization to move funds. Everpay must match the exact local transaction ID and authoritative transaction details, and the backend must use the stored Didit decision/webhook status before allowing the underlying payment, ledger or payout action.
 
+## Reading a user's screening status
+
+The authenticated owner can read the current persisted result at GET /api/v1/compliance/didit/transactions/{transaction_id}. The response exposes status, action_required, Travel Rule status and update time, but not the raw provider response or risk score. This endpoint is intended for the app to refresh after a device SDK submission or a webhook status change.
+
 ## Webhook receiver
 
 Configure Didit to POST to /api/v1/compliance/didit/webhook. Subscribe to transaction.created and transaction.status.updated. Also subscribe to travel_rule.status.updated when using Travel Rule transfers.
