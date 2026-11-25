@@ -16,8 +16,7 @@ class DiditVerificationService:
         return f"{base.rstrip('/')}/compliance/didit/verification-webhook" if base else None
 
     async def create_session(self, *, subject_id: str, entity_type: str,
-                             workflow_id: str, callback: str | None,
-                             callback_method: str, language: str | None) -> dict[str, Any]:
+                             workflow_id: str, language: str | None) -> dict[str, Any]:
         if not workflow_id:
             raise RuntimeError(f"Didit {entity_type} verification workflow is not configured")
         case_id = str(uuid4())
