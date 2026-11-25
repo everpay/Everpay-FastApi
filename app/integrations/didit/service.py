@@ -2,7 +2,7 @@ from typing import Any
 import structlog
 from app.integrations.didit.client import DiditAPIError, DiditClient
 from app.integrations.didit.repository import DiditRepository
-from app.integrations.didit.schemas import ServerTransactionRequest
+from app.integrations.didit.schemas import Counterparty, ServerTransactionRequest, Subject, TransactionDetails
 
 logger = structlog.get_logger(__name__)
 
@@ -15,7 +15,7 @@ class DiditMonitoringService:
         self.repository = repository or DiditRepository()
 
     async def screen_server_transaction(self, request: ServerTransactionRequest) -> dict[str, Any]:
-        """Screen a transaction whose data was loaded from trusted Everpay records."""
+        """Screen transaction data loaded and validated by trusted Everpay services."""
         payload = request.didit_payload()
         existing = await self.repository.reserve_server_transaction(payload)
         if existing is not None:
@@ -23,7 +23,8 @@ class DiditMonitoringService:
         try:
             decision = await self.client.create_transaction(payload)
         except DiditAPIError as exc:
-            await self.repository.mark_submission_uncertain(request.transaction_id, f"HTTP {exc.status_code}: {exc.detail}")
+            await self.repository.mark_submission_uncertain(request.transaction_id, f"Didit HTTP status {exc.status_code}; reconcile before retrying")
+            logger.error("didit_screening_submission_uncertain", transaction_id=request.transaction_id, http_status=exc.status_code)
             raise
         if not decision.get("uuid") or decision.get("txn_id") != request.transaction_id or decision.get("status") not in ("APPROVED", "IN_REVIEW", "DECLINED", "AWAITING_USER"):
             await self.repository.mark_submission_uncertain(request.transaction_id, "Didit response missing expected uuid, txn_id or status")
@@ -32,5 +33,14 @@ class DiditMonitoringService:
         logger.info("didit_transaction_screened", transaction_id=request.transaction_id, didit_uuid=decision["uuid"], status=decision["status"], score=decision.get("score"))
         return decision
 
-    async def register_device_transaction(self, transaction_id: str, vendor_data: str) -> None:
-        await self.repository.register_device_transaction(transaction_id, vendor_data)
+    async def register_device_transaction(self, transaction_id: str, vendor_data: str,
+            transaction_details: TransactionDetails, full_name: str, entity_type: str = "individual",
+            counterparty: Counterparty | None = None) -> None:
+        subject = Subject(entity_type=entity_type, vendor_data=vendor_data, full_name=full_name)
+        await self.repository.register_device_transaction(
+            transaction_id=transaction_id,
+            vendor_data=vendor_data,
+            transaction_details=transaction_details.model_dump(mode="json", exclude_none=True),
+            subject_snapshot=subject.model_dump(mode="json", exclude_none=True),
+            counterparty_snapshot=counterparty.model_dump(mode="json", exclude_none=True) if counterparty else None,
+        )
