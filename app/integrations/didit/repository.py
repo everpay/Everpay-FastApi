@@ -1,4 +1,5 @@
 import json
+from uuid import uuid4
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from sqlalchemy import text
@@ -39,9 +40,9 @@ class DiditRepository:
 
     async def reserve_server_transaction(self, request: dict[str, Any]) -> dict[str, Any] | None:
         query = text("""INSERT INTO didit_transaction_screenings
-            (transaction_id, vendor_data, lane, transaction_category, transaction_details,
+            (transaction_id, didit_txn_id, vendor_data, lane, transaction_category, transaction_details,
              subject_snapshot, counterparty_snapshot, status, created_at, updated_at)
-            VALUES (:transaction_id, :vendor_data, 'server', :category, CAST(:details AS JSONB),
+            VALUES (:transaction_id, :transaction_id, :vendor_data, 'server', :category, CAST(:details AS JSONB),
                     CAST(:subject AS JSONB), CAST(:counterparty AS JSONB), 'SUBMITTING', now(), now())
             ON CONFLICT (transaction_id) DO NOTHING RETURNING transaction_id""")
         async with self._engine().begin() as conn:
@@ -86,20 +87,22 @@ class DiditRepository:
 
     async def register_device_transaction(self, transaction_id: str, vendor_data: str,
             transaction_details: dict[str, Any], subject_snapshot: dict[str, Any],
-            counterparty_snapshot: dict[str, Any] | None = None) -> None:
+            counterparty_snapshot: dict[str, Any] | None = None) -> str:
+        didit_txn_id = "epdev_" + uuid4().hex
         async with self._engine().begin() as conn:
             result = await conn.execute(text("""INSERT INTO didit_transaction_screenings
-                (transaction_id, vendor_data, lane, transaction_category, transaction_details,
+                (transaction_id, didit_txn_id, vendor_data, lane, transaction_category, transaction_details,
                  subject_snapshot, counterparty_snapshot, status, created_at, updated_at)
-                VALUES (:transaction_id, :vendor_data, 'device', 'finance', CAST(:details AS JSONB),
+                VALUES (:transaction_id, :didit_txn_id, :vendor_data, 'device', 'finance', CAST(:details AS JSONB),
                  CAST(:subject AS JSONB), CAST(:counterparty AS JSONB), 'AWAITING_DEVICE_SUBMISSION', now(), now())
-                ON CONFLICT (transaction_id) DO NOTHING RETURNING transaction_id"""), {
-                    "transaction_id": transaction_id, "vendor_data": vendor_data,
+                ON CONFLICT (transaction_id) DO NOTHING RETURNING didit_txn_id"""), {
+                    "transaction_id": transaction_id, "didit_txn_id": didit_txn_id, "vendor_data": vendor_data,
                     "details": json.dumps(self._safe_details(transaction_details)), "subject": json.dumps(self._safe_subject(subject_snapshot)),
                     "counterparty": json.dumps(self._safe_counterparty(counterparty_snapshot)) if counterparty_snapshot else "null",
                 })
-            if not result.first():
-                row = (await conn.execute(text("""SELECT vendor_data, lane, transaction_details
+            inserted = result.first()
+            if not inserted:
+                row = (await conn.execute(text("""SELECT didit_txn_id, vendor_data, lane, transaction_details
                     FROM didit_transaction_screenings WHERE transaction_id=:transaction_id"""),
                     {"transaction_id": transaction_id})).mappings().first()
                 if not row or row["lane"] != "device" or row["vendor_data"] != vendor_data:
@@ -109,7 +112,9 @@ class DiditRepository:
                     existing_details = json.loads(existing_details)
                 if existing_details != self._safe_details(transaction_details):
                     raise PermissionError("Registered transaction details cannot be changed")
-        await self.replay_pending_webhooks(transaction_id)
+                didit_txn_id = row["didit_txn_id"]
+        await self.replay_pending_webhooks(didit_txn_id)
+        return didit_txn_id
 
     async def get_user_screening(self, transaction_id: str, vendor_data: str) -> dict[str, Any] | None:
         async with self._engine().connect() as conn:
@@ -119,13 +124,13 @@ class DiditRepository:
                 {"transaction_id": transaction_id, "vendor_data": vendor_data})).mappings().first()
             return dict(row) if row else None
 
-    async def device_transaction_owned(self, transaction_id: str, vendor_data: str) -> bool:
+    async def device_transaction_owned(self, transaction_id: str, vendor_data: str) -> str | None:
         async with self._engine().connect() as conn:
-            row = (await conn.execute(text("""SELECT 1 FROM didit_transaction_screenings
+            row = (await conn.execute(text("""SELECT didit_txn_id FROM didit_transaction_screenings
                 WHERE transaction_id=:transaction_id AND vendor_data=:vendor_data AND lane='device'
                   AND status='AWAITING_DEVICE_SUBMISSION' AND (sdk_token_expires_at IS NULL OR sdk_token_expires_at <= now())"""),
                 {"transaction_id": transaction_id, "vendor_data": vendor_data})).first()
-            return row is not None
+            return str(row[0]) if row else None
 
 
     async def mark_device_token_issued(self, transaction_id: str, vendor_data: str, expires_at) -> bool:
@@ -138,13 +143,13 @@ class DiditRepository:
                 {"transaction_id": transaction_id, "vendor_data": vendor_data, "expires_at": expires_at})
             return result.rowcount == 1
 
-    async def replay_pending_webhooks(self, transaction_id: str, didit_uuid: str | None = None) -> int:
+    async def replay_pending_webhooks(self, didit_txn_id: str, didit_uuid: str | None = None) -> int:
         async with self._engine().connect() as conn:
             rows = (await conn.execute(text("""SELECT payload FROM didit_webhook_events
                 WHERE processing_status='PENDING'
-                  AND (payload->>'txn_id'=:transaction_id OR (:didit_uuid IS NOT NULL AND payload->>'transaction_id'=:didit_uuid))
+                  AND (payload->>'txn_id'=:didit_txn_id OR (:didit_uuid IS NOT NULL AND payload->>'transaction_id'=:didit_uuid))
                 ORDER BY received_at ASC LIMIT 100"""),
-                {"transaction_id": transaction_id, "didit_uuid": didit_uuid})).all()
+                {"didit_txn_id": didit_txn_id, "didit_uuid": didit_uuid})).all()
         processed = 0
         for row in rows:
             event = row[0]
@@ -177,7 +182,7 @@ class DiditRepository:
 
             matched = None
             if txn_id:
-                matched = (await conn.execute(text("SELECT transaction_id, transaction_details FROM didit_transaction_screenings WHERE transaction_id=:txn_id"),
+                matched = (await conn.execute(text("SELECT transaction_id, transaction_details FROM didit_transaction_screenings WHERE didit_txn_id=:txn_id"),
                     {"txn_id": txn_id})).first()
             if not matched and didit_uuid:
                 matched = (await conn.execute(text("SELECT transaction_id, transaction_details FROM didit_transaction_screenings WHERE didit_transaction_uuid=:uuid"),
