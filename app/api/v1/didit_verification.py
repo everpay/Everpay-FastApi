@@ -108,8 +108,8 @@ async def didit_verification_webhook(
     request: Request,
     x_signature_v2: str = Header(default="", alias="X-Signature-V2"),
 ):
-    if not didit_settings.didit_webhook_secret:
-        raise HTTPException(status_code=503, detail="Didit webhook verification is not configured")
+    if not didit_settings.didit_verification_webhook_secret:
+        raise HTTPException(status_code=503, detail="Didit KYC/KYB webhook verification is not configured")
     raw = await request.body()
     if len(raw) > didit_settings.didit_webhook_max_body_bytes:
         raise HTTPException(status_code=413, detail="Webhook payload too large")
@@ -117,7 +117,7 @@ async def didit_verification_webhook(
         event = json.loads(raw)
     except (json.JSONDecodeError, UnicodeDecodeError):
         raise HTTPException(status_code=400, detail="Invalid webhook JSON")
-    if not isinstance(event, dict) or not verify_didit_signature(event, x_signature_v2, didit_settings.didit_webhook_secret):
+    if not isinstance(event, dict) or not verify_didit_signature(event, x_signature_v2, didit_settings.didit_verification_webhook_secret):
         raise HTTPException(status_code=401, detail="Invalid Didit webhook signature")
     timestamp = event.get("timestamp")
     if isinstance(timestamp, str):
@@ -165,7 +165,8 @@ async def didit_provider_status(_: dict[str, Any] = Depends(get_current_user)):
         "secondary_provider": {"kyc": "aiprise", "kyb": "aiprise", "mode": "manual_fallback_only"},
         "didit": {
             "api_configured": bool(didit_settings.didit_api_key),
-            "webhook_configured": bool(didit_settings.didit_webhook_secret),
+            "transaction_webhook_configured": bool(didit_settings.didit_webhook_secret),
+            "verification_webhook_configured": bool(didit_settings.didit_verification_webhook_secret),
             "kyc_workflow_configured": bool(didit_settings.didit_kyc_workflow_id),
             "kyb_workflow_configured": bool(didit_settings.didit_kyb_workflow_id),
             "kyc_workflow_id": didit_settings.didit_kyc_workflow_id,
