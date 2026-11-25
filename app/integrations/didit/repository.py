@@ -37,8 +37,11 @@ class DiditRepository:
 
     async def save_provider_decision(self, transaction_id: str, decision: dict[str, Any]) -> None:
         query = text("""UPDATE didit_transaction_screenings SET didit_transaction_uuid=:uuid,
-            status=:status, score=:score, severity=:severity,
-            action_required=CAST(:action_required AS JSONB), provider_response=CAST(:provider_response AS JSONB),
+            status=CASE WHEN last_transaction_event_at IS NULL THEN :status ELSE status END,
+            score=CASE WHEN last_transaction_event_at IS NULL THEN :score ELSE score END,
+            severity=CASE WHEN last_transaction_event_at IS NULL THEN :severity ELSE severity END,
+            action_required=CASE WHEN last_transaction_event_at IS NULL THEN CAST(:action_required AS JSONB) ELSE action_required END,
+            provider_response=CAST(:provider_response AS JSONB),
             updated_at=now() WHERE transaction_id=:transaction_id""")
         async with self._engine().begin() as conn:
             result = await conn.execute(query, {
@@ -53,7 +56,8 @@ class DiditRepository:
 
     async def mark_submission_uncertain(self, transaction_id: str, detail: str) -> None:
         async with self._engine().begin() as conn:
-            await conn.execute(text("""UPDATE didit_transaction_screenings SET status='RECONCILIATION_REQUIRED',
+            await conn.execute(text("""UPDATE didit_transaction_screenings SET
+                status=CASE WHEN last_transaction_event_at IS NULL THEN 'RECONCILIATION_REQUIRED' ELSE status END,
                 last_error=:detail, updated_at=now() WHERE transaction_id=:transaction_id"""),
                 {"transaction_id": transaction_id, "detail": detail[:1000]})
 
