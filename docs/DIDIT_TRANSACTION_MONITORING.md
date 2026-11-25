@@ -30,7 +30,7 @@ The API does not create these tables at startup. Apply and verify the migration 
 
 ## Server lane — POST /v3/transactions/
 
-Use DiditMonitoringService.screen_server_transaction() from the backend payment, ledger or payout orchestration after loading the source transaction and customer/beneficiary from trusted Everpay records. The browser must not supply the authoritative amount, currency, direction, counterparty or subject identity.
+Use DiditMonitoringService.screen_server_transaction() from the backend payment, ledger or payout orchestration after loading the source transaction and customer/beneficiary from trusted Everpay records. The browser must not supply the authoritative amount, currency, direction, counterparty or subject identity. The server service reserves the local transaction ID before the provider call and does not blindly retry a non-idempotent create.
 
 Example call (all transaction/customer/beneficiary values below must originate from trusted backend records):
 
@@ -72,20 +72,25 @@ For crypto, set currency_kind to crypto, use the ticker only in currency, and su
 Before a user can request a device token, a trusted backend flow must register the actual Everpay transaction using:
 
 ~~~python
+from app.integrations.didit.schemas import TransactionDetails
+from app.integrations.didit.service import DiditMonitoringService
+
 await DiditMonitoringService().register_device_transaction(
     transaction_id=transaction.id,
     vendor_data=str(authenticated_user.id),
-    transaction_details={
-        "direction": "outbound",
-        "amount": transaction.amount,
-        "currency": transaction.currency,
-        "currency_kind": "fiat",
-    },
+    transaction_details=TransactionDetails(
+        direction="outbound",
+        amount=transaction.amount,
+        currency=transaction.currency,
+        currency_kind="fiat",
+    ),
     full_name=authenticated_user.full_name,
 )
+
+# Import TransactionDetails from app.integrations.didit.schemas.
 ~~~
 
-Then the signed-in client calls POST /api/v1/compliance/didit/sdk-token with JSON body containing only transaction_id. Supabase Bearer authentication identifies the user; the endpoint ignores any client-supplied user ID. It verifies that the transaction was registered to that same user and that no unexpired SDK token has already been issued, applies a Redis rate limit, then requests a 900-second Didit SDK token with max_uses=1. The token expiry is persisted before the token is returned. The response has Cache-Control: no-store.
+Then the signed-in client calls POST /api/v1/compliance/didit/sdk-token with JSON body containing only transaction_id. Supabase Bearer authentication identifies the user; the endpoint ignores any client-supplied user ID. It verifies that the transaction was registered to that same user and that no unexpired SDK token has already been issued, applies a Redis rate limit, then requests a 900-second Didit SDK token with max_uses=1. The token expiry is persisted before the token is returned. A second token cannot be minted while the previous token remains unexpired. The response has Cache-Control: no-store.
 
 Install @didit-protocol/sdk-web in the frontend and submit with DiditSdk.shared.submitTransaction. Set txnId to the exact transaction ID registered by the backend. Device-lane subject identity is supplied by Didit's token; do not send subject.externalUserId. The API key must never be included in frontend build variables.
 
