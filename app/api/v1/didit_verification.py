@@ -2,9 +2,11 @@ import hashlib
 import hmac
 import json
 from datetime import datetime, timezone
+import httpx
 from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from app.core.auth import get_current_user
+from app.core.config import settings
 from app.integrations.didit.client import DiditAPIError, DiditClient
 from app.integrations.didit.config import didit_settings
 from app.integrations.didit.verification_repository import DiditVerificationRepository
@@ -20,7 +22,7 @@ def _subject_id(user: dict[str, Any]) -> str:
     return str(user["id"])
 
 
-def _authorize_business(user: dict[str, Any], business_id: str) -> None:
+async def _authorize_business(user: dict[str, Any], business_id: str) -> None:
     metadata = user.get("app_metadata") or {}
     role = str(metadata.get("role") or "").lower()
     allowed = metadata.get("business_ids") or []
@@ -28,7 +30,30 @@ def _authorize_business(user: dict[str, Any], business_id: str) -> None:
         return
     if business_id == str(metadata.get("business_id") or "") or business_id in {str(x) for x in allowed}:
         return
-    raise HTTPException(status_code=403, detail="Not authorized for this business")
+    # Verify the actual merchant -> authenticated user relationship server-side.
+    # The Platform OS merchant onboarding table uses merchants.id and merchants.user_id.
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        raise HTTPException(status_code=503, detail="Merchant ownership verification is not configured")
+    try:
+        async with httpx.AsyncClient(timeout=settings.auth_timeout_seconds) as client:
+            response = await client.get(
+                f"{settings.supabase_url.rstrip('/')}/rest/v1/merchants",
+                params={"select": "id", "id": f"eq.{business_id}", "user_id": f"eq.{user['id']}", "limit": "1"},
+                headers={
+                    "apikey": settings.supabase_service_role_key,
+                    "Authorization": f"Bearer {settings.supabase_service_role_key}",
+                },
+            )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=503, detail="Merchant ownership service unavailable") from exc
+    if response.status_code != 200:
+        raise HTTPException(status_code=503, detail="Merchant ownership service unavailable")
+    try:
+        rows = response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail="Invalid merchant ownership response") from exc
+    if not isinstance(rows, list) or not rows:
+        raise HTTPException(status_code=403, detail="Not authorized for this business")
 
 
 @router.post("/kyc/sessions")
@@ -49,7 +74,7 @@ async def create_kyc_session(body: DiditKycSessionRequest, user: dict[str, Any] 
 @router.post("/kyb/businesses/{business_id}/sessions")
 async def create_kyb_session(business_id: str, body: DiditKybSessionRequest,
                               user: dict[str, Any] = Depends(get_current_user)):
-    _authorize_business(user, business_id)
+    await _authorize_business(user, business_id)
     if not didit_settings.didit_kyb_workflow_id:
         raise HTTPException(status_code=503, detail="Primary Didit KYB workflow is not configured")
     try:
