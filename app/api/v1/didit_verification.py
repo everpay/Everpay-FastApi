@@ -9,6 +9,7 @@ from app.integrations.didit.client import DiditAPIError, DiditClient
 from app.integrations.didit.config import didit_settings
 from app.integrations.didit.verification_repository import DiditVerificationRepository
 from app.integrations.didit.verification_schemas import DiditKycSessionRequest, DiditKybSessionRequest
+from app.integrations.aiprise.config import aiprise_settings
 from app.integrations.didit.verification_service import DiditVerificationService
 from app.api.v1.didit import canonicalize_webhook, verify_didit_signature
 
@@ -37,8 +38,8 @@ async def create_kyc_session(body: DiditKycSessionRequest, user: dict[str, Any] 
     try:
         return await DiditVerificationService().create_session(
             subject_id=_subject_id(user), entity_type="individual",
-            workflow_id=didit_settings.didit_kyc_workflow_id, callback=body.callback,
-            callback_method=body.callback_method, language=body.language,
+            workflow_id=didit_settings.didit_kyc_workflow_id, callback=None,
+            callback_method="completer", language=body.language,
         )
     except DiditAPIError as exc:
         raise HTTPException(status_code=502, detail="Didit KYC session could not be created; reconcile before retrying") from exc
@@ -55,8 +56,8 @@ async def create_kyb_session(business_id: str, body: DiditKybSessionRequest,
     try:
         return await DiditVerificationService().create_session(
             subject_id=business_id, entity_type="business",
-            workflow_id=didit_settings.didit_kyb_workflow_id, callback=body.callback,
-            callback_method=body.callback_method, language=body.language,
+            workflow_id=didit_settings.didit_kyb_workflow_id, callback=None,
+            callback_method="completer", language=body.language,
         )
     except DiditAPIError as exc:
         raise HTTPException(status_code=502, detail="Didit KYB session could not be created; reconcile before retrying") from exc
@@ -66,7 +67,17 @@ async def create_kyb_session(business_id: str, body: DiditKybSessionRequest,
 
 @router.get("/verification-cases/{case_id}")
 async def get_verification_case(case_id: str, user: dict[str, Any] = Depends(get_current_user)):
-    record = await DiditVerificationRepository().get_case(case_id, _subject_id(user))
+    repository = DiditVerificationRepository()
+    record = await repository.get_case(case_id, _subject_id(user))
+    if record is None:
+        metadata = user.get("app_metadata") or {}
+        business_ids = {str(x) for x in (metadata.get("business_ids") or [])}
+        if metadata.get("business_id"):
+            business_ids.add(str(metadata["business_id"]))
+        for business_id in business_ids:
+            record = await repository.get_case(case_id, business_id)
+            if record is not None:
+                break
     if record is None:
         raise HTTPException(status_code=404, detail="Verification case not found")
     return record
@@ -74,7 +85,17 @@ async def get_verification_case(case_id: str, user: dict[str, Any] = Depends(get
 
 @router.post("/verification-cases/{case_id}/refresh")
 async def refresh_verification_case(case_id: str, user: dict[str, Any] = Depends(get_current_user)):
-    record = await DiditVerificationRepository().get_case(case_id, _subject_id(user))
+    repository = DiditVerificationRepository()
+    record = await repository.get_case(case_id, _subject_id(user))
+    if record is None:
+        metadata = user.get("app_metadata") or {}
+        business_ids = {str(x) for x in (metadata.get("business_ids") or [])}
+        if metadata.get("business_id"):
+            business_ids.add(str(metadata["business_id"]))
+        for business_id in business_ids:
+            record = await repository.get_case(case_id, business_id)
+            if record is not None:
+                break
     if record is None or not record.get("didit_session_id"):
         raise HTTPException(status_code=404, detail="Verification session not found")
     try:
@@ -126,9 +147,14 @@ async def didit_verification_webhook(
         result = await repo.record_webhook_event(event_id, event_type, session_id, data)
         if result == "duplicate":
             return {"ok": True, "outcome": "duplicate"}
+        if result == "pending":
+            return {"ok": True, "outcome": "pending"}
         if event_type in {"status.updated", "business.status.updated"}:
             decision = {"status": data.get("status"), "session_kind": data.get("session_kind")}
-            await repo.apply_decision(session_id, decision)
+            applied = await repo.apply_decision(session_id, decision)
+            if not applied:
+                return {"ok": True, "outcome": "pending"}
+        await repo.mark_webhook_processed(event_id)
         return {"ok": True, "outcome": "processed"}
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Could not persist Didit verification webhook") from exc
@@ -144,5 +170,11 @@ async def didit_provider_status(_: dict[str, Any] = Depends(get_current_user)):
             "webhook_configured": bool(didit_settings.didit_webhook_secret),
             "kyc_workflow_configured": bool(didit_settings.didit_kyc_workflow_id),
             "kyb_workflow_configured": bool(didit_settings.didit_kyb_workflow_id),
+            "kyc_workflow_id": didit_settings.didit_kyc_workflow_id,
+            "kyb_workflow_id": didit_settings.didit_kyb_workflow_id,
+        },
+        "aiprise_secondary_fallback": {
+            "configured": bool(aiprise_settings.aiprise_api_key),
+            "automatic_failover": False,
         },
     }
