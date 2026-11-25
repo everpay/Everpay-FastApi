@@ -128,7 +128,7 @@ class DiditRepository:
         async with self._engine().connect() as conn:
             row = (await conn.execute(text("""SELECT didit_txn_id FROM didit_transaction_screenings
                 WHERE transaction_id=:transaction_id AND vendor_data=:vendor_data AND lane='device'
-                  AND status='AWAITING_DEVICE_SUBMISSION' AND (sdk_token_expires_at IS NULL OR sdk_token_expires_at <= now())"""),
+                  AND status='AWAITING_DEVICE_SUBMISSION' AND sdk_token_issued_at IS NULL"""),
                 {"transaction_id": transaction_id, "vendor_data": vendor_data})).first()
             return str(row[0]) if row else None
 
@@ -139,7 +139,7 @@ class DiditRepository:
                 sdk_token_issued_at=now(), sdk_token_expires_at=:expires_at, updated_at=now()
                 WHERE transaction_id=:transaction_id AND vendor_data=:vendor_data AND lane='device'
                   AND status='AWAITING_DEVICE_SUBMISSION'
-                  AND (sdk_token_expires_at IS NULL OR sdk_token_expires_at <= now())"""),
+                  AND sdk_token_issued_at IS NULL"""),
                 {"transaction_id": transaction_id, "vendor_data": vendor_data, "expires_at": expires_at})
             return result.rowcount == 1
 
