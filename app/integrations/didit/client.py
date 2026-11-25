@@ -37,6 +37,13 @@ class DiditClient:
             raise DiditAPIError(502, "Didit returned an unexpected response")
         return result
 
+    async def create_verification_session(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return await self._request("POST", "/v3/session/", payload=payload)
+
+    async def get_verification_decision(self, session_id: str) -> dict[str, Any]:
+        from urllib.parse import quote
+        return await self._request("GET", f"/v3/session/{quote(session_id, safe='')}/decision/")
+
     async def create_transaction(self, payload: dict[str, Any]) -> dict[str, Any]:
         return await self._request("POST", "/v3/transactions/", payload=payload)
 
