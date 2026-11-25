@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS didit_transaction_screenings (
     travel_rule_status STRING(40) NULL,
     last_transaction_event_at TIMESTAMPTZ NULL,
     last_travel_rule_event_at TIMESTAMPTZ NULL,
+    sdk_token_issued_at TIMESTAMPTZ NULL,
+    sdk_token_expires_at TIMESTAMPTZ NULL,
     last_error STRING(1000) NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
