@@ -42,10 +42,11 @@ class DiditMonitoringService:
         # are checked before the device lane is registered.
         ServerTransactionRequest(transaction_id=transaction_id, transaction_details=transaction_details,
                                  subject=subject, counterparty=counterparty)
-        await self.repository.register_device_transaction(
+        didit_txn_id = await self.repository.register_device_transaction(
             transaction_id=transaction_id,
             vendor_data=vendor_data,
             transaction_details=transaction_details.model_dump(mode="json", exclude_none=True),
             subject_snapshot=subject.model_dump(mode="json", exclude_none=True),
             counterparty_snapshot=counterparty.model_dump(mode="json", exclude_none=True) if counterparty else None,
         )
+        return didit_txn_id
