@@ -58,7 +58,6 @@ class DiditVerificationRepository:
         if not isinstance(warnings, list):
             warnings = [str(warnings)]
         warnings = [str(x)[:120] for x in warnings[:50]]
-        # Store only a minimized decision summary; no identity document images or raw PII.
         summary = {
             "session_kind": decision.get("session_kind"),
             "status": status,
@@ -85,41 +84,52 @@ class DiditVerificationRepository:
             """), {"case_id": case_id, "subject_id": subject_id})).mappings().first()
             return dict(row) if row else None
 
-    async def get_case_by_vendor_data(self, vendor_data: str, entity_type: str) -> dict[str, Any] | None:
-        async with self._engine().connect() as conn:
-            row = (await conn.execute(text("""
-                SELECT case_id, subject_id, entity_type, didit_session_id
-                FROM didit_verification_cases
-                WHERE vendor_data=:vendor_data AND entity_type=:entity_type
-                ORDER BY created_at DESC LIMIT 1
-            """), {"vendor_data": vendor_data, "entity_type": entity_type})).mappings().first()
-            return dict(row) if row else None
-
     async def record_webhook_event(self, event_id: str, event_type: str, session_id: str,
                                    payload: dict[str, Any]) -> str:
         async with self._engine().begin() as conn:
             inserted = await conn.execute(text("""
                 INSERT INTO didit_verification_webhook_events
-                    (event_id, event_type, didit_session_id, received_at)
-                VALUES (:event_id, :event_type, :session_id, now())
+                    (event_id, event_type, didit_session_id, payload, processing_status, received_at)
+                VALUES (:event_id, :event_type, :session_id, CAST(:payload AS JSONB), 'PENDING', now())
                 ON CONFLICT (event_id) DO NOTHING RETURNING event_id
-            """), {"event_id": event_id, "event_type": event_type[:100], "session_id": session_id})
+            """), {"event_id": event_id, "event_type": event_type[:100],
+                    "session_id": session_id, "payload": json.dumps(payload, ensure_ascii=False)})
             if not inserted.first():
                 return "duplicate"
-            return "received"
+            exists = (await conn.execute(text("""
+                SELECT 1 FROM didit_verification_cases WHERE didit_session_id=:session_id
+            """), {"session_id": session_id})).first()
+            return "received" if exists else "pending"
+
+    async def mark_webhook_processed(self, event_id: str) -> None:
+        async with self._engine().begin() as conn:
+            await conn.execute(text("""
+                UPDATE didit_verification_webhook_events
+                SET processing_status='PROCESSED', processed_at=now(), payload=CAST('{}' AS JSONB)
+                WHERE event_id=:event_id
+            """), {"event_id": event_id})
+
+    async def replay_pending_events(self, session_id: str) -> int:
+        async with self._engine().connect() as conn:
+            rows = (await conn.execute(text("""
+                SELECT event_id, payload FROM didit_verification_webhook_events
+                WHERE didit_session_id=:session_id AND processing_status='PENDING'
+                ORDER BY received_at ASC LIMIT 100
+            """), {"session_id": session_id})).all()
+        count = 0
+        for event_id, payload in rows:
+            if isinstance(payload, str):
+                payload = json.loads(payload)
+            await self.apply_decision(session_id, payload)
+            await self.mark_webhook_processed(str(event_id))
+            count += 1
+        return count
 
 
 def _feature_statuses(decision: dict[str, Any]) -> dict[str, str]:
-    allowed = {
-        "kyc": ("kyc", "status"), "aml": ("aml", "status"),
-        "kyb_registry": ("kyb_registry", "status"),
-        "kyb_company_aml": ("kyb_company_aml", "status"),
-        "kyb_documents": ("kyb_documents", "status"),
-        "kyb_key_people": ("kyb_key_people", "status"),
+    fields = ("kyc", "aml", "kyb_registry", "kyb_company_aml", "kyb_documents", "kyb_key_people")
+    return {
+        key: str(decision[key].get("status"))[:40]
+        for key in fields
+        if isinstance(decision.get(key), dict) and decision[key].get("status") is not None
     }
-    result = {}
-    for key, (field, status_field) in allowed.items():
-        value = decision.get(field)
-        if isinstance(value, dict) and value.get(status_field) is not None:
-            result[key] = str(value[status_field])[:40]
-    return result
