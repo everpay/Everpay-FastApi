@@ -1,6 +1,6 @@
 from decimal import Decimal
 from typing import Any, Literal
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Direction = Literal["inbound", "outbound"]
 CurrencyKind = Literal["fiat", "crypto"]
@@ -33,11 +33,20 @@ class TransactionDetails(BaseModel):
             raise ValueError("currency is required")
         return normalized
 
+    @model_validator(mode="after")
+    def validate_crypto_fields(self):
+        if self.currency_kind == "crypto" and not self.crypto_params:
+            raise ValueError("crypto_params.crypto_chain is required for crypto transactions")
+        if self.currency_kind == "fiat" and self.crypto_params:
+            raise ValueError("crypto_params is only valid for crypto transactions")
+        return self
+
 class Subject(BaseModel):
     model_config = ConfigDict(extra="forbid")
     entity_type: Literal["individual", "company"] = "individual"
     vendor_data: str = Field(min_length=1, max_length=128)
     full_name: str = Field(min_length=1, max_length=256)
+    payment_method: PaymentMethod | None = None
 
 class Counterparty(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -45,13 +54,22 @@ class Counterparty(BaseModel):
     payment_method: PaymentMethod | None = None
 
 class ServerTransactionRequest(BaseModel):
-    """Only construct this from trusted, persisted Everpay transaction data."""
+    """Construct only from trusted, persisted Everpay transaction data."""
     model_config = ConfigDict(extra="forbid")
     transaction_id: str = Field(min_length=1, max_length=128)
     transaction_category: TransactionCategory = "finance"
     transaction_details: TransactionDetails
     subject: Subject
     counterparty: Counterparty | None = None
+
+    @model_validator(mode="after")
+    def validate_crypto_wallet_location(self):
+        details = self.transaction_details
+        if details.currency_kind == "crypto" and details.payment_reference_id:
+            wallet = self.counterparty.payment_method if details.direction == "outbound" and self.counterparty else self.subject.payment_method if details.direction == "inbound" else None
+            if wallet is None or wallet.method_type not in ("crypto_wallet", "unhosted_wallet"):
+                raise ValueError("A crypto wallet payment_method is required on the counterparty for outbound or subject for inbound transfers with a transaction hash")
+        return self
 
     def didit_payload(self) -> dict[str, Any]:
         payload = self.model_dump(mode="json", exclude_none=True)
