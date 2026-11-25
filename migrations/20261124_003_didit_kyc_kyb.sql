@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS didit_verification_cases (
     callback_url STRING(2048) NULL,
     status STRING(32) NOT NULL,
     decision_summary JSONB NULL,
+    last_event_at TIMESTAMPTZ NULL,
     last_error STRING(500) NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
