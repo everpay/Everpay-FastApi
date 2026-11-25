@@ -138,6 +138,8 @@ class AiPriseRepository:
 
         summary = payload.get("aiprise_summary") or {}
         decision = summary.get("decision") or summary.get("verification_result")
+        if event_type == "CASE_STATUS_UPDATE":
+            decision = payload.get("verification_result") or decision
         if event_type == "AML_MONITORING_UPDATE":
             aml_update = payload.get("aml_monitoring_update") or {}
             if aml_update.get("status") in ("MATCH_FOUND", "POTENTIAL_MATCH"):
