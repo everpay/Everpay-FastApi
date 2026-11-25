@@ -9,3 +9,4 @@ celery[redis]>=5.4,<6.0
 redis>=5.0,<7.0
 structlog>=24.4,<26.0
 pytest>=8.3,<9.0
+python-dotenv>=1.0,<2.0
