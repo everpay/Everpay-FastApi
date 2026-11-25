@@ -91,7 +91,7 @@ didit_transaction_id = await DiditMonitoringService().register_device_transactio
 # Import TransactionDetails from app.integrations.didit.schemas.
 ~~~
 
-Then the signed-in client calls POST /api/v1/compliance/didit/sdk-token with JSON body containing only the local Everpay transaction_id. Supabase Bearer authentication identifies the user; the endpoint ignores any client-supplied user ID. It verifies that the transaction was registered to that same user and that no SDK token has previously been issued for that transaction, applies a Redis rate limit, then requests a 900-second Didit SDK token with max_uses=1. The response includes sdkToken, expiresAt and the backend-generated opaque transactionId. The token expiry is persisted before the token is returned. A second token cannot be minted for the same registered transaction, even after expiry. If the one-use token expires unused, create a new Everpay transaction attempt with a new local ID and register it separately. The response has Cache-Control: no-store.
+Then the signed-in client calls POST /v1/compliance/didit/sdk-token with JSON body containing only the local Everpay transaction_id. Supabase Bearer authentication identifies the user; the endpoint ignores any client-supplied user ID. It verifies that the transaction was registered to that same user and that no SDK token has previously been issued for that transaction, applies a Redis rate limit, then requests a 900-second Didit SDK token with max_uses=1. The response includes sdkToken, expiresAt and the backend-generated opaque transactionId. The token expiry is persisted before the token is returned. A second token cannot be minted for the same registered transaction, even after expiry. If the one-use token expires unused, create a new Everpay transaction attempt with a new local ID and register it separately. The response has Cache-Control: no-store.
 
 Install @didit-protocol/sdk-web in the frontend and submit with DiditSdk.shared.submitTransaction. Set txnId to transactionId returned by the token endpoint (the opaque Didit ID), not the local Everpay transaction ID. Device-lane subject identity is supplied by Didit's token; do not send subject.externalUserId. The API key must never be included in frontend build variables.
 
@@ -122,11 +122,11 @@ Important: the SDK token binds vendor_data to the user; it does not cryptographi
 
 ## Reading a user's screening status
 
-The authenticated owner can read the current persisted result at GET /api/v1/compliance/didit/transactions/{transaction_id}. The response exposes status, action_required, Travel Rule status and update time, but not the raw provider response or risk score. This endpoint is intended for the app to refresh after a device SDK submission or a webhook status change.
+The authenticated owner can read the current persisted result at GET /v1/compliance/didit/transactions/{transaction_id}. The response exposes status, action_required, Travel Rule status and update time, but not the raw provider response or risk score. This endpoint is intended for the app to refresh after a device SDK submission or a webhook status change.
 
 ## Webhook receiver
 
-Configure Didit to POST to /api/v1/compliance/didit/webhook. Subscribe to transaction.created and transaction.status.updated. Also subscribe to travel_rule.status.updated when using Travel Rule transfers.
+Configure Didit to POST to /v1/compliance/didit/webhook. Subscribe to transaction.created and transaction.status.updated. Also subscribe to travel_rule.status.updated when using Travel Rule transfers.
 
 The receiver:
 
