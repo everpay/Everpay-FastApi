@@ -1,3 +1,4 @@
+import hashlib
 from typing import Any
 from uuid import uuid4
 from app.integrations.didit.client import DiditAPIError, DiditClient
@@ -16,7 +17,6 @@ class DiditVerificationService:
         if not workflow_id:
             raise RuntimeError(f"Didit {entity_type} verification workflow is not configured")
         case_id = str(uuid4())
-        import hashlib
         prefix = "epu_" if entity_type == "individual" else "epb_"
         vendor_data = prefix + hashlib.sha256(subject_id.encode("utf-8")).hexdigest()[:40]
         await self.repository.reserve_case(
