@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import re
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -87,10 +88,11 @@ def canonicalize_webhook(event: dict[str, Any]) -> bytes:
     return canonical.encode("utf-8")
 
 def verify_didit_signature(event: dict[str, Any], signature: str, secret: str) -> bool:
-    if not signature or not secret:
+    normalized_signature = signature.strip()
+    if not secret or not re.fullmatch(r"[0-9a-fA-F]{64}", normalized_signature):
         return False
     expected = hmac.new(secret.encode("utf-8"), canonicalize_webhook(event), hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature.strip().lower())
+    return hmac.compare_digest(expected, normalized_signature.lower())
 
 @router.get("/transactions/{transaction_id}")
 async def get_user_transaction_screening(transaction_id: str, user: dict[str, Any] = Depends(get_current_user)):
