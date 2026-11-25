@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
     app_name: str = "Everpay API"
     app_env: Literal["local", "test", "staging", "production"] = "local"
-    api_v1_prefix: str = "/api/v1"
+    api_v1_prefix: str = "/v1"
     log_level: str = "INFO"
     cors_origins: list[str] = Field(default_factory=list)
     database_url: str | None = None
