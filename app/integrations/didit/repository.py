@@ -196,6 +196,10 @@ class DiditRepository:
             if isinstance(details, str):
                 details = json.loads(details)
             if webhook_type in ("transaction.created", "transaction.status.updated"):
+                if event.get("status") not in ("APPROVED", "IN_REVIEW", "DECLINED", "AWAITING_USER"):
+                    raise ValueError("Unsupported Didit transaction status")
+                if event.get("severity") is not None and event.get("severity") not in ("UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"):
+                    raise ValueError("Unsupported Didit risk severity")
                 try:
                     amount_matches = Decimal(str(event.get("amount"))) == Decimal(str(details["amount"]))
                 except (InvalidOperation, KeyError, TypeError):
