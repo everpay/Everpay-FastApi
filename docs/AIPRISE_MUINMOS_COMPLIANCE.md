@@ -1,8 +1,8 @@
-# AiPrise + Muinmos compliance integration
+# AiPrise secondary provider + Muinmos compliance orchestration
 
 ## Scope
 
-This integration adds AiPrise KYC/KYB API workflows and a common Everpay compliance-agent catalog. It preserves Didit transaction monitoring/KYT as a separate transaction-time control. All decisions remain subject to Everpay policy and authorized compliance review.
+Didit is Everpay's primary KYC, KYB and transaction-monitoring provider. See [Didit Primary KYC/KYB](DIDIT_PRIMARY_KYC_KYB.md). AiPrise is retained as a secondary KYC/KYB provider for explicitly enabled, operator-directed fallback only; it is not automatically invoked when Didit times out or declines. The Muinmos agent catalogue remains a separate orchestration capability. All decisions remain subject to Everpay policy and authorized compliance review.
 
 ### AiPrise capabilities
 
@@ -70,6 +70,7 @@ Set these server-side in the FastAPI secret manager; never expose them as Vite v
 
 ```dotenv
 AIPRISE_API_KEY=
+AIPRISE_SECONDARY_FALLBACK_ENABLED=false
 AIPRISE_WEBHOOK_SECRET=
 AIPRISE_BASE_URL=https://api-sandbox.aiprise.com/api/v1/verify
 AIPRISE_ENVIRONMENT=sandbox
@@ -85,6 +86,8 @@ AIPRISE_WEBHOOK_MAX_BODY_BYTES=1048576
 Set `AIPRISE_WEBHOOK_SECRET` to the AiPrise API private key used by its documented callback HMAC procedure. Confirm with AiPrise whether that is identical to the `X-API-KEY` credential in your account; do not assume they are interchangeable.
 
 ## Dashboard setup
+
+AiPrise API routes reject verification submissions with HTTP 409 unless `AIPRISE_SECONDARY_FALLBACK_ENABLED=true`. Keep this false for normal operation. Enable it only for an authorized, documented manual fallback process after checking whether a Didit case already exists.
 
 1. Create separate KYC, email-check, phone-check and KYB templates in AiPrise.
 2. Enable One-Click KYC only for countries and ID types enabled for Everpay's account.
