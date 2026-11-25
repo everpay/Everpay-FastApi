@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 from app.core.auth import get_current_user
 from app.core.config import settings
+from app.integrations.didit.config import didit_settings
 from app.integrations.didit.client import DiditAPIError, DiditClient
 from app.integrations.didit.repository import DiditRepository
 from app.integrations.didit.schemas import DeviceTokenRequest
@@ -15,17 +16,18 @@ from app.integrations.didit.schemas import DeviceTokenRequest
 router = APIRouter(prefix="/compliance/didit", tags=["compliance - Didit"])
 
 async def _rate_limit_sdk_token(user_id: str) -> None:
-    if not settings.redis_url:
+    redis_url = didit_settings.redis_url or settings.redis_url
+    if not redis_url:
         if settings.app_env in ("staging", "production"):
             raise HTTPException(status_code=503, detail="Token issuance rate limiter is unavailable")
         return
-    client = Redis.from_url(settings.redis_url, socket_connect_timeout=2, socket_timeout=2, decode_responses=True)
+    client = Redis.from_url(redis_url, socket_connect_timeout=2, socket_timeout=2, decode_responses=True)
     key = f"everpay:didit:sdk-token:{hashlib.sha256(user_id.encode()).hexdigest()}"
     try:
         count = await client.incr(key)
         if count == 1:
             await client.expire(key, 60)
-        if count > settings.didit_sdk_token_max_per_minute:
+        if count > didit_settings.didit_sdk_token_max_per_minute:
             raise HTTPException(status_code=429, detail="Too many transaction token requests")
     except HTTPException:
         raise
@@ -36,7 +38,7 @@ async def _rate_limit_sdk_token(user_id: str) -> None:
 
 @router.post("/sdk-token", response_model=None)
 async def create_sdk_token(body: DeviceTokenRequest, user: dict[str, Any] = Depends(get_current_user)):
-    if not settings.didit_api_key:
+    if not didit_settings.didit_api_key:
         raise HTTPException(status_code=503, detail="Didit integration is not configured")
     user_id = str(user["id"])
     repository = DiditRepository()
@@ -78,10 +80,10 @@ def verify_didit_signature(event: dict[str, Any], signature: str, secret: str) -
 
 @router.post("/webhook", include_in_schema=False)
 async def didit_webhook(request: Request, x_signature_v2: str = Header(default="", alias="X-Signature-V2")):
-    if not settings.didit_webhook_secret:
+    if not didit_didit_settings.didit_webhook_secret:
         raise HTTPException(status_code=503, detail="Didit webhook verification is not configured")
     raw = await request.body()
-    if len(raw) > settings.didit_webhook_max_body_bytes:
+    if len(raw) > didit_settings.didit_webhook_max_body_bytes:
         raise HTTPException(status_code=413, detail="Webhook payload too large")
     try:
         event = json.loads(raw)
@@ -94,7 +96,7 @@ async def didit_webhook(request: Request, x_signature_v2: str = Header(default="
     timestamp = event.get("timestamp")
     if not isinstance(timestamp, (int, float)) or isinstance(timestamp, bool):
         raise HTTPException(status_code=401, detail="Missing signed webhook timestamp")
-    if abs(time.time() - float(timestamp)) > settings.didit_webhook_tolerance_seconds:
+    if abs(time.time() - float(timestamp)) > didit_settings.didit_webhook_tolerance_seconds:
         raise HTTPException(status_code=401, detail="Stale Didit webhook event")
     try:
         outcome = await DiditRepository().process_webhook(event)
