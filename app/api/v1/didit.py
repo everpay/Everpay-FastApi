@@ -102,13 +102,13 @@ async def get_user_transaction_screening(transaction_id: str, user: dict[str, An
         raise HTTPException(status_code=503, detail="Transaction screening store unavailable") from exc
     if record is None:
         raise HTTPException(status_code=404, detail="Transaction screening record not found")
-    return {
+    return JSONResponse({
         "transaction_id": record["transaction_id"],
         "status": record["status"],
         "action_required": record["action_required"],
         "travel_rule_status": record["travel_rule_status"],
         "updated_at": record["updated_at"],
-    }
+    }, headers={"Cache-Control": "no-store, private", "Pragma": "no-cache"})
 
 @router.post("/webhook", include_in_schema=False)
 async def didit_webhook(request: Request, x_signature_v2: str = Header(default="", alias="X-Signature-V2")):
