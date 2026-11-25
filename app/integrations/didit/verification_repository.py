@@ -107,7 +107,22 @@ class DiditVerificationRepository:
             """), {"event_id": event_id, "event_type": event_type[:100],
                     "session_id": session_id, "payload": json.dumps(payload, ensure_ascii=False)})
             if not inserted.first():
-                return "duplicate"
+                processing_status = (await conn.execute(text("""
+                    SELECT processing_status FROM didit_verification_webhook_events
+                    WHERE event_id=:event_id
+                """), {"event_id": event_id})).scalar_one_or_none()
+                if processing_status == "PROCESSED":
+                    return "duplicate"
+            data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+            vendor_data = str(data.get("vendor_data") or "")
+            if vendor_data:
+                await conn.execute(text("""
+                    UPDATE didit_verification_cases
+                    SET didit_session_id=COALESCE(didit_session_id, :session_id),
+                        status=CASE WHEN status='SUBMITTING' THEN 'IN_PROGRESS' ELSE status END,
+                        updated_at=now()
+                    WHERE vendor_data=:vendor_data AND didit_session_id IS NULL
+                """), {"session_id": session_id, "vendor_data": vendor_data})
             exists = (await conn.execute(text("""
                 SELECT 1 FROM didit_verification_cases WHERE didit_session_id=:session_id
             """), {"session_id": session_id})).first()
