@@ -85,9 +85,20 @@ class DiditRepository:
         async with self._engine().connect() as conn:
             row = (await conn.execute(text("""SELECT 1 FROM didit_transaction_screenings
                 WHERE transaction_id=:transaction_id AND vendor_data=:vendor_data AND lane='device'
-                  AND status='AWAITING_DEVICE_SUBMISSION'"""),
+                  AND status='AWAITING_DEVICE_SUBMISSION' AND (sdk_token_expires_at IS NULL OR sdk_token_expires_at <= now())"""),
                 {"transaction_id": transaction_id, "vendor_data": vendor_data})).first()
             return row is not None
+
+
+    async def mark_device_token_issued(self, transaction_id: str, vendor_data: str, expires_at) -> bool:
+        async with self._engine().begin() as conn:
+            result = await conn.execute(text("""UPDATE didit_transaction_screenings SET
+                sdk_token_issued_at=now(), sdk_token_expires_at=:expires_at, updated_at=now()
+                WHERE transaction_id=:transaction_id AND vendor_data=:vendor_data AND lane='device'
+                  AND status='AWAITING_DEVICE_SUBMISSION'
+                  AND (sdk_token_expires_at IS NULL OR sdk_token_expires_at <= now())"""),
+                {"transaction_id": transaction_id, "vendor_data": vendor_data, "expires_at": expires_at})
+            return result.rowcount == 1
 
     async def replay_pending_webhooks(self, transaction_id: str, didit_uuid: str | None = None) -> int:
         async with self._engine().connect() as conn:
