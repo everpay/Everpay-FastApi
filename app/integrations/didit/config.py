@@ -10,7 +10,6 @@ class DiditSettings(BaseSettings):
     didit_base_url: str = "https://verification.didit.me"
     didit_kyc_workflow_id: str | None = None
     didit_kyb_workflow_id: str | None = None
-    didit_callback_base_url: str | None = None
     didit_timeout_seconds: float = Field(default=12.0, gt=0, le=60)
     didit_sdk_token_ttl_seconds: int = Field(default=900, ge=60, le=86400)
     didit_sdk_token_max_per_minute: int = Field(default=5, ge=1, le=60)
