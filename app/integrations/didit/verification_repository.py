@@ -151,8 +151,10 @@ class DiditVerificationRepository:
             timestamp = payload.get("timestamp")
             event_at = None
             if isinstance(timestamp, str):
-                from datetime import datetime
+                from datetime import datetime, timezone
                 event_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                if event_at.tzinfo is None:
+                    event_at = event_at.replace(tzinfo=timezone.utc)
             elif isinstance(timestamp, (int, float)) and not isinstance(timestamp, bool):
                 from datetime import datetime, timezone
                 event_at = datetime.fromtimestamp(float(timestamp), tz=timezone.utc)
