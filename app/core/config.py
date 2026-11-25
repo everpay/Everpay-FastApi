@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     database_pool_timeout_seconds: int = 10
     supabase_url: str | None = None
     supabase_anon_key: str | None = None
+    supabase_service_role_key: str | None = None
     auth_timeout_seconds: float = 5.0
     redis_url: str | None = None
     celery_task_always_eager: bool = False
