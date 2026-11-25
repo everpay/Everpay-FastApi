@@ -104,7 +104,10 @@ class DiditRepository:
                     {"transaction_id": transaction_id})).mappings().first()
                 if not row or row["lane"] != "device" or row["vendor_data"] != vendor_data:
                     raise PermissionError("Transaction is not registered to this user for device screening")
-                if row["transaction_details"] != transaction_details:
+                existing_details = row["transaction_details"]
+                if isinstance(existing_details, str):
+                    existing_details = json.loads(existing_details)
+                if existing_details != self._safe_details(transaction_details):
                     raise PermissionError("Registered transaction details cannot be changed")
         await self.replay_pending_webhooks(transaction_id)
 
