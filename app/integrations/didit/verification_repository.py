@@ -49,7 +49,7 @@ class DiditVerificationRepository:
                     last_error=:reason, updated_at=now() WHERE case_id=:case_id
             """), {"case_id": case_id, "reason": reason[:500]})
 
-    async def apply_decision(self, session_id: str, decision: dict[str, Any]) -> bool:
+    async def apply_decision(self, session_id: str, decision: dict[str, Any], event_at=None) -> bool:
         status = str(decision.get("status") or "IN_REVIEW").upper().replace(" ", "_")
         if status not in {"NOT_STARTED","IN_PROGRESS","IN_REVIEW","APPROVED","DECLINED",
                           "EXPIRED","ABANDONED","KYC_EXPIRED","RESUBMITTED","AWAITING_USER"}:
@@ -73,10 +73,19 @@ class DiditVerificationRepository:
             result = await conn.execute(text("""
                 UPDATE didit_verification_cases
                 SET status=:status, decision_summary=CAST(:summary AS JSONB),
+                    last_event_at=CASE WHEN :event_at IS NULL THEN last_event_at ELSE :event_at END,
                     last_error=NULL, updated_at=now()
                 WHERE didit_session_id=:session_id
-            """), {"session_id": session_id, "status": status, "summary": json.dumps(summary)})
-            return result.rowcount == 1
+                  AND (:event_at IS NULL OR last_event_at IS NULL OR last_event_at <= :event_at)
+            """), {"session_id": session_id, "status": status, "summary": json.dumps(summary), "event_at": event_at})
+            if result.rowcount == 1:
+                return True
+            # A zero-row update can mean an out-of-order stale event, not an unknown session.
+            async with self._engine().connect() as conn:
+                exists = (await conn.execute(text("""
+                    SELECT 1 FROM didit_verification_cases WHERE didit_session_id=:session_id
+                """), {"session_id": session_id})).first()
+            return exists is not None
 
     async def get_case(self, case_id: str, subject_id: str) -> dict[str, Any] | None:
         async with self._engine().connect() as conn:
@@ -116,15 +125,25 @@ class DiditVerificationRepository:
     async def replay_pending_events(self, session_id: str) -> int:
         async with self._engine().connect() as conn:
             rows = (await conn.execute(text("""
-                SELECT event_id, payload FROM didit_verification_webhook_events
+                SELECT event_id, event_type, payload FROM didit_verification_webhook_events
                 WHERE didit_session_id=:session_id AND processing_status='PENDING'
                 ORDER BY received_at ASC LIMIT 100
             """), {"session_id": session_id})).all()
         count = 0
-        for event_id, payload in rows:
+        for event_id, event_type, payload in rows:
             if isinstance(payload, str):
                 payload = json.loads(payload)
-            await self.apply_decision(session_id, payload)
+            data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+            timestamp = payload.get("timestamp")
+            event_at = None
+            if isinstance(timestamp, str):
+                from datetime import datetime
+                event_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            elif isinstance(timestamp, (int, float)) and not isinstance(timestamp, bool):
+                from datetime import datetime, timezone
+                event_at = datetime.fromtimestamp(float(timestamp), tz=timezone.utc)
+            if event_type in {"status.updated", "business.status.updated"}:
+                await self.apply_decision(session_id, data, event_at)
             await self.mark_webhook_processed(str(event_id))
             count += 1
         return count
