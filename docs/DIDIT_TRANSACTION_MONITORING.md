@@ -23,7 +23,7 @@ The Didit settings loader reads .env.local for local development. Keep common ap
 
 Apply migrations/20261124_001_didit_transaction_monitoring.sql before enabling the integration. It creates two compliance-specific tables and does not alter the financial ledger:
 
-- didit_transaction_screenings stores local transaction mapping, Didit UUID, lane, minimized subject/counterparty snapshots, amount/currency/direction, screening decision, score, severity, action-required payload and Travel Rule status.
+- didit_transaction_screenings stores the local Everpay transaction ID, a unique Didit transaction ID, Didit UUID, lane, user mapping, minimized subject/counterparty snapshots, amount/currency/direction, screening decision, score, severity, action-required payload and Travel Rule status.
 - didit_webhook_events retains unprocessed payloads for replay; after successful processing, the payload is cleared while the event ID/type/timestamps remain for deduplication and audit.
 - didit_webhook_events stores signed event payloads and a durable unique event_id for idempotent webhook handling.
 
@@ -70,13 +70,13 @@ For crypto, set currency_kind to crypto, use the ticker only in currency, and su
 
 ## Device lane — SDK token
 
-Before a user can request a device token, a trusted backend flow must register the actual Everpay transaction using:
+Before a user can request a device token, a trusted backend flow must register the actual Everpay transaction using. The method returns a separate opaque Didit transaction ID; retain it only as the ID to submit to Didit, while continuing to use the local Everpay transaction ID for your own payment records:
 
 ~~~python
 from app.integrations.didit.schemas import TransactionDetails
 from app.integrations.didit.service import DiditMonitoringService
 
-await DiditMonitoringService().register_device_transaction(
+didit_transaction_id = await DiditMonitoringService().register_device_transaction(
     transaction_id=transaction.id,
     vendor_data=str(authenticated_user.id),
     transaction_details=TransactionDetails(
@@ -91,9 +91,9 @@ await DiditMonitoringService().register_device_transaction(
 # Import TransactionDetails from app.integrations.didit.schemas.
 ~~~
 
-Then the signed-in client calls POST /api/v1/compliance/didit/sdk-token with JSON body containing only transaction_id. Supabase Bearer authentication identifies the user; the endpoint ignores any client-supplied user ID. It verifies that the transaction was registered to that same user and that no unexpired SDK token has already been issued, applies a Redis rate limit, then requests a 900-second Didit SDK token with max_uses=1. The token expiry is persisted before the token is returned. A second token cannot be minted while the previous token remains unexpired. The response has Cache-Control: no-store.
+Then the signed-in client calls POST /api/v1/compliance/didit/sdk-token with JSON body containing only the local Everpay transaction_id. Supabase Bearer authentication identifies the user; the endpoint ignores any client-supplied user ID. It verifies that the transaction was registered to that same user and that no unexpired SDK token has already been issued, applies a Redis rate limit, then requests a 900-second Didit SDK token with max_uses=1. The response includes sdkToken, expiresAt and the backend-generated opaque transactionId. The token expiry is persisted before the token is returned. A second token cannot be minted while the previous token remains unexpired. The response has Cache-Control: no-store.
 
-Install @didit-protocol/sdk-web in the frontend and submit with DiditSdk.shared.submitTransaction. Set txnId to the exact transaction ID registered by the backend. Device-lane subject identity is supplied by Didit's token; do not send subject.externalUserId. The API key must never be included in frontend build variables.
+Install @didit-protocol/sdk-web in the frontend and submit with DiditSdk.shared.submitTransaction. Set txnId to transactionId returned by the token endpoint (the opaque Didit ID), not the local Everpay transaction ID. Device-lane subject identity is supplied by Didit's token; do not send subject.externalUserId. The API key must never be included in frontend build variables.
 
 ~~~typescript
 import { DiditSdk } from "@didit-protocol/sdk-web";
@@ -101,7 +101,7 @@ import { DiditSdk } from "@didit-protocol/sdk-web";
 const result = await DiditSdk.shared.submitTransaction({
   transactionToken: sdkToken,
   transaction: {
-    txnId: transaction.id,
+    txnId: diditToken.transactionId,
     category: "finance",
     details: {
       direction: "out",
@@ -153,7 +153,7 @@ Webhook status changes can supersede the synchronous decision. The backend decis
 - Sandbox applications return APPROVED with score 0 and do not execute rules or send webhooks. This is not proof of live screening.
 - A 403 insufficient_credits response means screening cannot be completed; alert operations and hold screening-dependent activity.
 - A blocklisted vendor_data can return 400. Investigate; do not substitute a different user identifier.
-- The webhook does not include vendor_data. Map txn_id or Didit transaction UUID to the local screening record.
+- The webhook does not include vendor_data. Map txn_id to the backend-generated didit_txn_id (or transaction_id UUID to the stored Didit UUID) to recover the local Everpay transaction and user. Never map a device-lane webhook by trusting a client-supplied local transaction ID.
 - Store only screening metadata and necessary provider response fields. Never send or store raw PAN/CVV.
 
 ## Deployment checklist
