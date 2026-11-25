@@ -106,6 +106,30 @@ async def get_verification_case(case_id: str, user: dict[str, Any] = Depends(get
     return record
 
 
+@router.get("/kyb/businesses/{business_id}/cases/{case_id}")
+async def get_business_verification_case(business_id: str, case_id: str,
+                                         user: dict[str, Any] = Depends(get_current_user)):
+    await _authorize_business(user, business_id)
+    record = await DiditVerificationRepository().get_case(case_id, business_id)
+    if record is None or record.get("entity_type") != "business":
+        raise HTTPException(status_code=404, detail="Business verification case not found")
+    return record
+
+
+@router.post("/kyb/businesses/{business_id}/cases/{case_id}/refresh")
+async def refresh_business_verification_case(business_id: str, case_id: str,
+                                              user: dict[str, Any] = Depends(get_current_user)):
+    await _authorize_business(user, business_id)
+    record = await DiditVerificationRepository().get_case(case_id, business_id)
+    if record is None or record.get("entity_type") != "business" or not record.get("didit_session_id"):
+        raise HTTPException(status_code=404, detail="Business verification session not found")
+    try:
+        decision = await DiditVerificationService().reconcile_session(str(record["didit_session_id"]))
+    except DiditAPIError as exc:
+        raise HTTPException(status_code=502, detail="Could not refresh Didit business verification decision") from exc
+    return {"case_id": case_id, "status": decision.get("status"), "session_kind": decision.get("session_kind")}
+
+
 @router.post("/verification-cases/{case_id}/refresh")
 async def refresh_verification_case(case_id: str, user: dict[str, Any] = Depends(get_current_user)):
     repository = DiditVerificationRepository()
