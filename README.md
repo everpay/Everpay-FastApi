@@ -32,7 +32,7 @@ The server lane is a backend service method, not a public client endpoint. Call 
 ## Run locally
 
 1. Use Python 3.12 and install dependencies with pip install -r requirements.txt.
-2. Copy .env.example to .env for common settings, and copy only DIDIT_* settings into .env.local for Didit credentials. Never commit either file.
+2. Copy .env.example to .env for common application settings. Keep DIDIT_API_KEY and DIDIT_WEBHOOK_SECRET in .env.local (the Didit settings loader reads both files). Never commit either file.
 3. Apply the approved CockroachDB migrations in order.
 4. Start the API with uvicorn app.main:app --reload --port 8000.
 5. Start a worker in a separate process with celery -A app.worker.celery_app worker --loglevel=INFO.
