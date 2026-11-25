@@ -26,3 +26,19 @@ def test_decision_summary_extracts_only_allowed_feature_statuses():
         "kyb_registry": "APPROVED",
         "kyb_company_aml": "IN_REVIEW",
     }
+
+def test_business_decision_summary_extracts_array_statuses_without_personal_data():
+    decision = {
+        "registry_checks": [{"status": "APPROVED", "registered_address": "private"}],
+        "key_people_checks": [{"status": "IN_REVIEW", "full_name": "private"}],
+        "company_aml_checks": [{"status": "APPROVED", "matches": ["private"]}],
+        "document_verifications": [{"status": "PENDING", "document_number": "private"}],
+    }
+    summary = _feature_statuses(decision)
+    assert summary == {
+        "registry_checks": "APPROVED",
+        "key_people_checks": "IN_REVIEW",
+        "company_aml_checks": "APPROVED",
+        "document_verifications": "PENDING",
+    }
+    assert "private" not in str(summary)
