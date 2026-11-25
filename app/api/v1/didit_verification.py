@@ -191,14 +191,15 @@ async def didit_verification_webhook(
     event_id = str(event.get("event_id") or data.get("event_id") or hashlib.sha256(raw).hexdigest())
     repo = DiditVerificationRepository()
     try:
-        result = await repo.record_webhook_event(event_id, event_type, session_id, data)
+        event_at = datetime.fromtimestamp(timestamp_value, tz=timezone.utc)
+        result = await repo.record_webhook_event(event_id, event_type, session_id, event)
         if result == "duplicate":
             return {"ok": True, "outcome": "duplicate"}
         if result == "pending":
             return {"ok": True, "outcome": "pending"}
         if event_type in {"status.updated", "business.status.updated"}:
             decision = {"status": data.get("status"), "session_kind": data.get("session_kind")}
-            applied = await repo.apply_decision(session_id, decision)
+            applied = await repo.apply_decision(session_id, decision, event_at)
             if not applied:
                 return {"ok": True, "outcome": "pending"}
         await repo.mark_webhook_processed(event_id)
