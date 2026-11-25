@@ -81,10 +81,9 @@ class DiditVerificationRepository:
             if result.rowcount == 1:
                 return True
             # A zero-row update can mean an out-of-order stale event, not an unknown session.
-            async with self._engine().connect() as conn:
-                exists = (await conn.execute(text("""
-                    SELECT 1 FROM didit_verification_cases WHERE didit_session_id=:session_id
-                """), {"session_id": session_id})).first()
+            exists = (await conn.execute(text("""
+                SELECT 1 FROM didit_verification_cases WHERE didit_session_id=:session_id
+            """), {"session_id": session_id})).first()
             return exists is not None
 
     async def get_case(self, case_id: str, subject_id: str) -> dict[str, Any] | None:
