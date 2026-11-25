@@ -92,6 +92,22 @@ def verify_didit_signature(event: dict[str, Any], signature: str, secret: str) -
     expected = hmac.new(secret.encode("utf-8"), canonicalize_webhook(event), hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature.strip().lower())
 
+@router.get("/transactions/{transaction_id}")
+async def get_user_transaction_screening(transaction_id: str, user: dict[str, Any] = Depends(get_current_user)):
+    try:
+        record = await DiditRepository().get_user_screening(transaction_id, str(user["id"]))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Transaction screening store unavailable") from exc
+    if record is None:
+        raise HTTPException(status_code=404, detail="Transaction screening record not found")
+    return {
+        "transaction_id": record["transaction_id"],
+        "status": record["status"],
+        "action_required": record["action_required"],
+        "travel_rule_status": record["travel_rule_status"],
+        "updated_at": record["updated_at"],
+    }
+
 @router.post("/webhook", include_in_schema=False)
 async def didit_webhook(request: Request, x_signature_v2: str = Header(default="", alias="X-Signature-V2")):
     if not didit_settings.didit_webhook_secret:
