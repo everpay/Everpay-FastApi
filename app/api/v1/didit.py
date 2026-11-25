@@ -45,10 +45,10 @@ async def create_sdk_token(body: DeviceTokenRequest, user: dict[str, Any] = Depe
     user_id = str(user["id"])
     repository = DiditRepository()
     try:
-        allowed = await repository.device_transaction_owned(body.transaction_id, user_id)
+        didit_txn_id = await repository.device_transaction_owned(body.transaction_id, user_id)
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Transaction screening store unavailable") from exc
-    if not allowed:
+    if not didit_txn_id:
         raise HTTPException(status_code=404, detail="Registered device transaction not found")
     await _rate_limit_sdk_token(user_id)
     try:
@@ -71,7 +71,7 @@ async def create_sdk_token(body: DeviceTokenRequest, user: dict[str, Any] = Depe
         raise HTTPException(status_code=503, detail="Could not persist Didit token issuance") from exc
     if not recorded:
         raise HTTPException(status_code=409, detail="A valid Didit token has already been issued for this transaction")
-    return JSONResponse({"sdkToken": token, "expiresAt": expires_at.isoformat()}, headers={"Cache-Control": "no-store, private", "Pragma": "no-cache"})
+    return JSONResponse({"sdkToken": token, "expiresAt": expires_at.isoformat(), "transactionId": didit_txn_id}, headers={"Cache-Control": "no-store, private", "Pragma": "no-cache"})
 
 def _shorten_floats(value: Any) -> Any:
     if isinstance(value, list):
