@@ -17,7 +17,7 @@ Set these values only in the FastAPI service environment or its secret manager:
 - DIDIT_WEBHOOK_TOLERANCE_SECONDS — defaults to 300.
 - DIDIT_WEBHOOK_MAX_BODY_BYTES — defaults to 262144.
 
-The settings loader reads .env.local for local development. The file is ignored by Git. Never prefix Didit secrets with VITE_ and never return the API key to a browser or mobile client.
+The Didit settings loader reads .env.local for local development. Keep common application settings (including DATABASE_URL, SUPABASE_URL, SUPABASE_ANON_KEY and REDIS_URL) in .env or process environment; put DIDIT_API_KEY and DIDIT_WEBHOOK_SECRET in .env.local. Both files are ignored by Git. Never prefix Didit secrets with VITE_ and never return the API key to a browser or mobile client.
 
 ## CockroachDB migration
 
@@ -75,12 +75,42 @@ Before a user can request a device token, a trusted backend flow must register t
 await DiditMonitoringService().register_device_transaction(
     transaction_id=transaction.id,
     vendor_data=str(authenticated_user.id),
+    transaction_details={
+        "direction": "outbound",
+        "amount": transaction.amount,
+        "currency": transaction.currency,
+        "currency_kind": "fiat",
+    },
+    full_name=authenticated_user.full_name,
 )
 ~~~
 
-Then the signed-in client calls POST /api/v1/compliance/didit/sdk-token with JSON body containing only transaction_id. Supabase Bearer authentication identifies the user; the endpoint ignores any client-supplied user ID. It verifies that the transaction was registered to that same user, applies a Redis rate limit, then requests a 900-second Didit SDK token with max_uses=1. The response has Cache-Control: no-store.
+Then the signed-in client calls POST /api/v1/compliance/didit/sdk-token with JSON body containing only transaction_id. Supabase Bearer authentication identifies the user; the endpoint ignores any client-supplied user ID. It verifies that the transaction was registered to that same user and that no unexpired SDK token has already been issued, applies a Redis rate limit, then requests a 900-second Didit SDK token with max_uses=1. The token expiry is persisted before the token is returned. The response has Cache-Control: no-store.
 
 Install @didit-protocol/sdk-web in the frontend and submit with DiditSdk.shared.submitTransaction. Set txnId to the exact transaction ID registered by the backend. Device-lane subject identity is supplied by Didit's token; do not send subject.externalUserId. The API key must never be included in frontend build variables.
+
+~~~typescript
+import { DiditSdk } from "@didit-protocol/sdk-web";
+
+const result = await DiditSdk.shared.submitTransaction({
+  transactionToken: sdkToken,
+  transaction: {
+    txnId: transaction.id,
+    category: "finance",
+    details: {
+      direction: "out",
+      amount: transaction.amount,
+      currency: transaction.currency,
+      currencyType: "fiat",
+    },
+    subject: { type: "individual", fullName: currentUser.fullName },
+  },
+});
+
+if (result.actionRequired?.type === "verification_session") {
+  DiditSdk.shared.startVerification({ url: result.actionRequired.url });
+}
+~~~
 
 Important: the SDK token binds vendor_data to the user; it does not cryptographically bind the transaction ID or transaction amount. Therefore, the client SDK result is not sufficient authorization to move funds. Everpay must match the exact local transaction ID and authoritative transaction details, and the backend must use the stored Didit decision/webhook status before allowing the underlying payment, ledger or payout action.
 
