@@ -8,6 +8,29 @@ class DiditRepositoryError(RuntimeError):
     pass
 
 class DiditRepository:
+    @staticmethod
+    def _safe_details(details: dict[str, Any]) -> dict[str, Any]:
+        allowed = ("direction", "amount", "currency", "currency_kind", "crypto_params", "include_crypto_screening")
+        return {key: details[key] for key in allowed if key in details}
+
+    @staticmethod
+    def _safe_subject(subject: dict[str, Any] | None) -> dict[str, Any] | None:
+        if not subject:
+            return None
+        safe = {key: subject[key] for key in ("entity_type", "vendor_data", "full_name") if key in subject}
+        if subject.get("payment_method"):
+            safe["payment_method"] = {"method_type": subject["payment_method"].get("method_type")}
+        return safe
+
+    @staticmethod
+    def _safe_counterparty(counterparty: dict[str, Any] | None) -> dict[str, Any] | None:
+        if not counterparty:
+            return None
+        safe = {"full_name": counterparty.get("full_name")} if counterparty.get("full_name") else {}
+        if counterparty.get("payment_method"):
+            safe["payment_method"] = {"method_type": counterparty["payment_method"].get("method_type")}
+        return safe
+
     def _engine(self):
         engine = get_engine()
         if engine is None:
@@ -24,9 +47,9 @@ class DiditRepository:
         async with self._engine().begin() as conn:
             inserted = (await conn.execute(query, {
                 "transaction_id": request["transaction_id"], "vendor_data": request["subject"]["vendor_data"],
-                "category": request["transaction_category"], "details": json.dumps(request["transaction_details"]),
-                "subject": json.dumps(request["subject"]),
-                "counterparty": json.dumps(request.get("counterparty")) if request.get("counterparty") else "null",
+                "category": request["transaction_category"], "details": json.dumps(self._safe_details(request["transaction_details"])),
+                "subject": json.dumps(self._safe_subject(request["subject"])),
+                "counterparty": json.dumps(self._safe_counterparty(request.get("counterparty"))) if request.get("counterparty") else "null",
             })).first()
             if inserted:
                 return None
@@ -48,7 +71,7 @@ class DiditRepository:
                 "uuid": decision.get("uuid"), "status": decision.get("status", "IN_REVIEW"),
                 "score": decision.get("score"), "severity": decision.get("severity"),
                 "action_required": json.dumps(decision.get("action_required")) if decision.get("action_required") is not None else "null",
-                "provider_response": json.dumps(decision), "transaction_id": transaction_id,
+                "provider_response": json.dumps({key: decision.get(key) for key in ("uuid", "txn_id", "status", "score", "severity")}), "transaction_id": transaction_id,
             })
             if result.rowcount != 1:
                 raise DiditRepositoryError("Reserved Didit screening record was not found")
@@ -72,8 +95,8 @@ class DiditRepository:
                  CAST(:subject AS JSONB), CAST(:counterparty AS JSONB), 'AWAITING_DEVICE_SUBMISSION', now(), now())
                 ON CONFLICT (transaction_id) DO NOTHING RETURNING transaction_id"""), {
                     "transaction_id": transaction_id, "vendor_data": vendor_data,
-                    "details": json.dumps(transaction_details), "subject": json.dumps(subject_snapshot),
-                    "counterparty": json.dumps(counterparty_snapshot) if counterparty_snapshot else "null",
+                    "details": json.dumps(self._safe_details(transaction_details)), "subject": json.dumps(self._safe_subject(subject_snapshot)),
+                    "counterparty": json.dumps(self._safe_counterparty(counterparty_snapshot)) if counterparty_snapshot else "null",
                 })
             if not result.first():
                 row = (await conn.execute(text("""SELECT vendor_data, lane, transaction_details
@@ -176,7 +199,7 @@ class DiditRepository:
                         last_error='Didit webhook amount, currency or direction did not match the registered Everpay transaction',
                         updated_at=now() WHERE transaction_id=:transaction_id"""), {"transaction_id": local_id})
                     await conn.execute(text("""UPDATE didit_webhook_events SET processing_status='PROCESSED',
-                        processed_at=now(), last_error='Transaction data mismatch; screening held' WHERE event_id=:event_id"""),
+                        processed_at=now(), payload=CAST('{}' AS JSONB), last_error='Transaction data mismatch; screening held' WHERE event_id=:event_id"""),
                         {"event_id": event_id})
                     return "mismatch"
                 await conn.execute(text("""UPDATE didit_transaction_screenings SET
@@ -195,5 +218,5 @@ class DiditRepository:
                     AND (last_travel_rule_event_at IS NULL OR last_travel_rule_event_at <= to_timestamp(:event_ts))"""),
                     {"status": event.get("travel_rule_status") or event.get("status"), "event_ts": timestamp, "transaction_id": local_id})
             await conn.execute(text("""UPDATE didit_webhook_events SET processing_status='PROCESSED',
-                processed_at=now(), last_error=NULL WHERE event_id=:event_id"""), {"event_id": event_id})
+                processed_at=now(), payload=CAST('{}' AS JSONB), last_error=NULL WHERE event_id=:event_id"""), {"event_id": event_id})
             return "processed"
