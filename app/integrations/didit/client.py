@@ -14,7 +14,7 @@ class DiditClient:
             raise RuntimeError("DIDIT_API_KEY is not configured")
         self.base_url = didit_settings.didit_base_url.rstrip("/")
         self.timeout = didit_settings.didit_timeout_seconds
-        self.api_key = settings.didit_api_key
+        self.api_key = didit_settings.didit_api_key
 
     async def _request(self, method: str, path: str, *, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         headers = {"x-api-key": self.api_key, "Accept": "application/json"}
