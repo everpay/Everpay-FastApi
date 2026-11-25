@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -56,7 +57,20 @@ async def create_sdk_token(body: DeviceTokenRequest, user: dict[str, Any] = Depe
     token = result.get("sdk_token")
     if not token:
         raise HTTPException(status_code=502, detail="Didit did not return an SDK token")
-    return JSONResponse({"sdkToken": token, "expiresAt": result.get("expires_at")}, headers={"Cache-Control": "no-store, private", "Pragma": "no-cache"})
+    expires_at_raw = result.get("expires_at")
+    try:
+        expires_at = datetime.fromisoformat(str(expires_at_raw).replace("Z", "+00:00")) if expires_at_raw else datetime.now(timezone.utc) + timedelta(seconds=didit_settings.didit_sdk_token_ttl_seconds)
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=didit_settings.didit_sdk_token_ttl_seconds)
+    try:
+        recorded = await repository.mark_device_token_issued(body.transaction_id, user_id, expires_at)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Could not persist Didit token issuance") from exc
+    if not recorded:
+        raise HTTPException(status_code=409, detail="A valid Didit token has already been issued for this transaction")
+    return JSONResponse({"sdkToken": token, "expiresAt": expires_at.isoformat()}, headers={"Cache-Control": "no-store, private", "Pragma": "no-cache"})
 
 def _shorten_floats(value: Any) -> Any:
     if isinstance(value, list):
