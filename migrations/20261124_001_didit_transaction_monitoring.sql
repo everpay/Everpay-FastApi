@@ -2,6 +2,7 @@
 -- Compliance integration tables only; this does not modify the financial ledger.
 CREATE TABLE IF NOT EXISTS didit_transaction_screenings (
     transaction_id STRING(128) PRIMARY KEY,
+    didit_txn_id STRING(128) NOT NULL UNIQUE,
     didit_transaction_uuid STRING UNIQUE,
     vendor_data STRING(128) NOT NULL,
     lane STRING(16) NOT NULL CHECK (lane IN ('server', 'device')),
