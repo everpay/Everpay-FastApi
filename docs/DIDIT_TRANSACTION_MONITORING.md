@@ -23,7 +23,8 @@ The Didit settings loader reads .env.local for local development. Keep common ap
 
 Apply migrations/20261124_001_didit_transaction_monitoring.sql before enabling the integration. It creates two compliance-specific tables and does not alter the financial ledger:
 
-- didit_transaction_screenings stores local transaction mapping, Didit UUID, lane, subject and counterparty snapshots, screening decision, score, severity, action-required payload and Travel Rule status.
+- didit_transaction_screenings stores local transaction mapping, Didit UUID, lane, minimized subject/counterparty snapshots, amount/currency/direction, screening decision, score, severity, action-required payload and Travel Rule status.
+- didit_webhook_events retains unprocessed payloads for replay; after successful processing, the payload is cleared while the event ID/type/timestamps remain for deduplication and audit.
 - didit_webhook_events stores signed event payloads and a durable unique event_id for idempotent webhook handling.
 
 The API does not create these tables at startup. Apply and verify the migration in staging before production.
@@ -135,7 +136,7 @@ The receiver:
 4. Persists event_id under a CockroachDB primary key and updates the screening record in the same database transaction.
 5. Acknowledges already-processed duplicate events without applying them twice. Database errors return 503 so Didit can retry.
 
-A correctly signed event with no local transaction mapping is stored as PENDING for reconciliation and returns a successful acknowledgement. Do not discard it. A status event is applied only when its signed timestamp is not older than the last event applied to that screening record.
+A correctly signed event with no local transaction mapping is stored as PENDING and returns a successful acknowledgement. When the server-lane response is saved or a device transaction is registered, the repository replays pending events matching that local transaction ID or Didit UUID. Do not discard pending events. Transaction and Travel Rule event streams have independent timestamp ordering, so one stream cannot suppress updates from the other. Processed webhook payloads are cleared after the decision/action has been persisted.
 
 ## Decision policy
 
@@ -145,7 +146,7 @@ A correctly signed event with no local transaction mapping is stored as PENDING 
 - DECLINED: block the transaction under Everpay policy. Do not capture, release or pay out.
 - action_required: pass the supplied action URL/type to the appropriate app flow. Verification-session actions need the app's Didit SDK or browser handoff; wallet-ownership action is handled by the SDK as documented.
 
-Webhook status changes can supersede the synchronous decision. The backend decision, not a client-only state, governs the transaction. Do not interpret a missing webhook as approval.
+Webhook status changes can supersede the synchronous decision. The backend decision, not a client-only state, governs the transaction. The webhook is verified and data-matched against the trusted Everpay amount, currency and direction before the status is applied. A mismatch sets DATA_MISMATCH and holds the transaction. Do not interpret a missing webhook as approval.
 
 ## Operational cases from the supplied Didit contract
 
