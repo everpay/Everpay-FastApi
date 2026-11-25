@@ -12,6 +12,9 @@ class UserVerificationInput(BaseModel):
     phone_number: str | None = Field(default=None, min_length=7, max_length=32)
     country_code: str | None = Field(default=None, min_length=2, max_length=2)
     address: dict[str, Any] | None = None
+    # Country/template-specific fields (e.g. registry ID values for One-Click KYC).
+    # The configured AiPrise template determines the exact accepted field names.
+    additional_user_data: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("phone_number")
     @classmethod
