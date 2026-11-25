@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class DiditSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=(".env", ".env.local"), env_file_encoding="utf-8", extra="ignore", case_sensitive=False)
     didit_api_key: str | None = None
+    redis_url: str | None = None
     didit_webhook_secret: str | None = None
     didit_base_url: str = "https://verification.didit.me"
     didit_timeout_seconds: float = Field(default=12.0, gt=0, le=60)
