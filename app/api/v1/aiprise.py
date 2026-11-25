@@ -44,16 +44,26 @@ def _authorize_business(user: dict[str, Any], business_id: str) -> None:
 
 @router.post("/aiprise/users/verification")
 async def start_user_verification(body: UserVerificationInput, user: dict[str, Any] = Depends(get_current_user)):
+    payload = body.model_dump(mode="json", exclude_none=True)
+    additional = payload.pop("additional_user_data", {})
+    if set(additional).intersection(payload):
+        raise HTTPException(status_code=422, detail="additional_user_data cannot override standard identity fields")
+    payload.update(additional)
     try:
-        return await _service().start_user_verification(str(user["id"]), body.model_dump(mode="json", exclude_none=True))
+        return await _service().start_user_verification(str(user["id"]), payload)
     except AiPriseAPIError as exc:
         raise _api_error(exc)
 
 
 @router.post("/aiprise/users/verification-url")
 async def create_user_verification_url(body: UserVerificationInput, user: dict[str, Any] = Depends(get_current_user)):
+    payload = body.model_dump(mode="json", exclude_none=True)
+    additional = payload.pop("additional_user_data", {})
+    if set(additional).intersection(payload):
+        raise HTTPException(status_code=422, detail="additional_user_data cannot override standard identity fields")
+    payload.update(additional)
     try:
-        return await _service().create_user_verification_url(str(user["id"]), body.model_dump(mode="json", exclude_none=True))
+        return await _service().create_user_verification_url(str(user["id"]), payload)
     except AiPriseAPIError as exc:
         raise _api_error(exc)
 
@@ -90,6 +100,18 @@ async def start_business_verification(business_id: str, body: BusinessVerificati
         return await _service().start_business_verification(business_id, body.model_dump(mode="json", exclude_none=True))
     except AiPriseAPIError as exc:
         raise _api_error(exc)
+
+
+@router.get("/aiprise/businesses/{business_id}/cases/{case_id}")
+async def get_aiprise_business_case(business_id: str, case_id: str, user: dict[str, Any] = Depends(get_current_user)):
+    _authorize_business(user, business_id)
+    try:
+        record = await AiPriseRepository().get_case(case_id, business_id)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Compliance case store unavailable") from exc
+    if record is None:
+        raise HTTPException(status_code=404, detail="Compliance case not found")
+    return record
 
 
 @router.get("/aiprise/cases/{case_id}")
