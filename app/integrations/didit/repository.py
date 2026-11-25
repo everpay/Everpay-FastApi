@@ -85,6 +85,14 @@ class DiditRepository:
                     raise PermissionError("Registered transaction details cannot be changed")
         await self.replay_pending_webhooks(transaction_id)
 
+    async def get_user_screening(self, transaction_id: str, vendor_data: str) -> dict[str, Any] | None:
+        async with self._engine().connect() as conn:
+            row = (await conn.execute(text("""SELECT transaction_id, status, action_required,
+                travel_rule_status, updated_at FROM didit_transaction_screenings
+                WHERE transaction_id=:transaction_id AND vendor_data=:vendor_data"""),
+                {"transaction_id": transaction_id, "vendor_data": vendor_data})).mappings().first()
+            return dict(row) if row else None
+
     async def device_transaction_owned(self, transaction_id: str, vendor_data: str) -> bool:
         async with self._engine().connect() as conn:
             row = (await conn.execute(text("""SELECT 1 FROM didit_transaction_screenings
