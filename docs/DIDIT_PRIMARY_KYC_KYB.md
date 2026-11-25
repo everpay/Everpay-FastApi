@@ -59,6 +59,18 @@ Do not place these IDs into production configuration until the corresponding wor
 
 The Sandbox application also has draft KYC + AML and Business Verification workflows. Publish and test those in Sandbox first, then publish the reviewed workflow versions in Live after sign-off.
 
+### Existing Live workflow settings inspected
+
+The existing Live **KYC + AML** draft is configured with OCR, liveness, face match, AML and IP analysis. AML ongoing monitoring is enabled. It is still a draft and has no published version.
+
+The existing Live **Business Verification (KYB)** draft has registry, company AML, documents and key-people checks enabled. Its configuration also requires KYC for beneficial owners and waits for all required UBOs to finish. However:
+- Officer KYC is currently disabled.
+- Ongoing KYB monitoring is currently disabled.
+- Registry-change monitoring is currently disabled.
+- Ownership percentage is not marked as required in the key-people form.
+
+These settings are not changed by this code PR. Everpay Compliance should confirm whether officer KYC and ongoing KYB/registry monitoring are required by its onboarding policy before the Live workflow is updated and published.
+
 ## Decision handling
 
 - `APPROVED`: provider screening passed; Everpay's own policy and other required controls must still pass.
