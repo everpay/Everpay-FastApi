@@ -11,10 +11,6 @@ class DiditVerificationService:
         self.client = client or DiditClient()
         self.repository = repository or DiditVerificationRepository()
 
-    def _callback_url(self) -> str | None:
-        base = didit_settings.didit_callback_base_url
-        return f"{base.rstrip('/')}/compliance/didit/verification-webhook" if base else None
-
     async def create_session(self, *, subject_id: str, entity_type: str,
                              workflow_id: str, language: str | None) -> dict[str, Any]:
         if not workflow_id:
@@ -23,10 +19,9 @@ class DiditVerificationService:
         import hashlib
         prefix = "epu_" if entity_type == "individual" else "epb_"
         vendor_data = prefix + hashlib.sha256(subject_id.encode("utf-8")).hexdigest()[:40]
-        callback_url = self._callback_url()
         await self.repository.reserve_case(
             case_id=case_id, subject_id=subject_id, entity_type=entity_type,
-            vendor_data=vendor_data, workflow_id=workflow_id, callback_url=callback_url,
+            vendor_data=vendor_data, workflow_id=workflow_id,
         )
         payload: dict[str, Any] = {"workflow_id": workflow_id, "vendor_data": vendor_data}
         # Didit webhooks are configured as a destination in the Didit application.
