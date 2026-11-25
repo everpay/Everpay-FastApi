@@ -188,7 +188,8 @@ async def didit_verification_webhook(
     vendor_data = str(data.get("vendor_data") or "")
     if not session_id:
         raise HTTPException(status_code=400, detail="Didit verification webhook is missing session_id")
-    event_id = str(event.get("event_id") or data.get("event_id") or hashlib.sha256(raw).hexdigest())
+    stable_event = {key: value for key, value in event.items() if key not in {"timestamp", "event_id"}}
+    event_id = str(event.get("event_id") or data.get("event_id") or hashlib.sha256(canonicalize_webhook(stable_event)).hexdigest())
     repo = DiditVerificationRepository()
     try:
         event_at = datetime.fromtimestamp(timestamp_value, tz=timezone.utc)
