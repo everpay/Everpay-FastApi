@@ -2,7 +2,7 @@ from typing import Any
 import structlog
 from app.integrations.didit.client import DiditAPIError, DiditClient
 from app.integrations.didit.repository import DiditRepository
-from app.integrations.didit.schemas import Counterparty, ServerTransactionRequest, Subject, TransactionDetails
+from app.integrations.didit.schemas import Counterparty, PaymentMethod, ServerTransactionRequest, Subject, TransactionDetails
 
 logger = structlog.get_logger(__name__)
 
@@ -35,8 +35,13 @@ class DiditMonitoringService:
 
     async def register_device_transaction(self, transaction_id: str, vendor_data: str,
             transaction_details: TransactionDetails, full_name: str, entity_type: str = "individual",
-            counterparty: Counterparty | None = None) -> None:
-        subject = Subject(entity_type=entity_type, vendor_data=vendor_data, full_name=full_name)
+            counterparty: Counterparty | None = None, subject_payment_method: PaymentMethod | None = None) -> None:
+        subject = Subject(entity_type=entity_type, vendor_data=vendor_data, full_name=full_name,
+                          payment_method=subject_payment_method)
+        # Reuse the server-lane validator so crypto wallet placement and transaction fields
+        # are checked before the device lane is registered.
+        ServerTransactionRequest(transaction_id=transaction_id, transaction_details=transaction_details,
+                                 subject=subject, counterparty=counterparty)
         await self.repository.register_device_transaction(
             transaction_id=transaction_id,
             vendor_data=vendor_data,
