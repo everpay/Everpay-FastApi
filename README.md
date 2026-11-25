@@ -17,10 +17,10 @@ FastAPI backend for Everpay Platform OS. It runs alongside the existing React/Vi
 | GET / | Service identity |
 | GET /health/live | Process liveness |
 | GET /health/ready | CockroachDB/Redis readiness |
-| GET /api/v1/me | Validated Supabase identity |
-| POST /api/v1/compliance/didit/sdk-token | Authenticated, transaction-bound Didit device token |
-| GET /api/v1/compliance/didit/transactions/{transaction_id} | Owner-scoped current screening status |
-| POST /api/v1/compliance/didit/webhook | Didit signed webhook receiver (hidden from public OpenAPI) |
+| GET /v1/me | Validated Supabase identity |
+| POST /v1/compliance/didit/sdk-token | Authenticated, transaction-bound Didit device token |
+| GET /v1/compliance/didit/transactions/{transaction_id} | Owner-scoped current screening status |
+| POST /v1/compliance/didit/webhook | Didit signed webhook receiver (hidden from public OpenAPI) |
 
 Interactive docs are available at /docs outside production and disabled in production.
 
