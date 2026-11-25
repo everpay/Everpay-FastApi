@@ -4,18 +4,12 @@ import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
 
 from app.core.auth import get_current_user
 from app.integrations.aiprise.client import AiPriseAPIError
 from app.integrations.aiprise.config import aiprise_settings
 from app.integrations.aiprise.repository import AiPriseRepository
-from app.integrations.aiprise.schemas import (
-    BusinessVerificationInput,
-    EmailCheckInput,
-    PhoneCheckInput,
-    UserVerificationInput,
-)
+from app.integrations.aiprise.schemas import BusinessVerificationInput, EmailCheckInput, PhoneCheckInput, UserVerificationInput
 from app.integrations.aiprise.service import AiPriseService
 from app.integrations.muinmos.agents import agent_catalog
 
@@ -31,84 +25,75 @@ def _service() -> AiPriseService:
 
 def _api_error(exc: AiPriseAPIError) -> HTTPException:
     return HTTPException(status_code=502, detail={
-        "code": "aiprise_provider_error",
-        "provider_status": exc.status_code,
+        "code": "aiprise_provider_error", "provider_status": exc.status_code,
         "message": "AiPrise request failed. Reconcile the case before submitting again.",
     })
 
 
+def _authorize_business(user: dict[str, Any], business_id: str) -> None:
+    metadata = user.get("app_metadata") or {}
+    role = str(metadata.get("role") or "").lower()
+    allowed_business_ids = metadata.get("business_ids") or []
+    own_business_id = metadata.get("business_id")
+    if role in {"admin", "super_admin", "compliance_admin"}:
+        return
+    if business_id == str(own_business_id or "") or business_id in {str(x) for x in allowed_business_ids}:
+        return
+    raise HTTPException(status_code=403, detail="You are not authorized to manage this business")
+
+
 @router.post("/aiprise/users/verification")
-async def start_user_verification(
-    body: UserVerificationInput,
-    user: dict[str, Any] = Depends(get_current_user),
-):
-    user_data = body.model_dump(mode="json", exclude_none=True)
+async def start_user_verification(body: UserVerificationInput, user: dict[str, Any] = Depends(get_current_user)):
     try:
-        return await _service().start_user_verification(str(user["id"]), user_data)
+        return await _service().start_user_verification(str(user["id"]), body.model_dump(mode="json", exclude_none=True))
     except AiPriseAPIError as exc:
         raise _api_error(exc)
 
 
 @router.post("/aiprise/users/verification-url")
-async def create_user_verification_url(
-    body: UserVerificationInput,
-    user: dict[str, Any] = Depends(get_current_user),
-):
-    user_data = body.model_dump(mode="json", exclude_none=True)
+async def create_user_verification_url(body: UserVerificationInput, user: dict[str, Any] = Depends(get_current_user)):
     try:
-        return await _service().create_user_verification_url(str(user["id"]), user_data)
+        return await _service().create_user_verification_url(str(user["id"]), body.model_dump(mode="json", exclude_none=True))
     except AiPriseAPIError as exc:
         raise _api_error(exc)
 
 
 @router.post("/aiprise/users/email-check")
-async def start_email_check(
-    body: EmailCheckInput,
-    user: dict[str, Any] = Depends(get_current_user),
-):
+async def start_email_check(body: EmailCheckInput, user: dict[str, Any] = Depends(get_current_user)):
     try:
-        return await _service().start_user_verification(
-            str(user["id"]), {"email_address": str(body.email_address)}, "email_check"
-        )
+        return await _service().start_user_verification(str(user["id"]), {"email_address": str(body.email_address)}, "email_check")
     except AiPriseAPIError as exc:
         raise _api_error(exc)
 
 
 @router.post("/aiprise/users/phone-check")
-async def start_phone_check(
-    body: PhoneCheckInput,
-    user: dict[str, Any] = Depends(get_current_user),
-):
+async def start_phone_check(body: PhoneCheckInput, user: dict[str, Any] = Depends(get_current_user)):
     try:
-        return await _service().start_user_verification(
-            str(user["id"]), {"phone_number": body.phone_number}, "phone_check"
-        )
+        return await _service().start_user_verification(str(user["id"]), {"phone_number": body.phone_number}, "phone_check")
+    except AiPriseAPIError as exc:
+        raise _api_error(exc)
+
+
+@router.post("/aiprise/businesses/{business_id}/profile")
+async def create_business_profile(business_id: str, body: BusinessVerificationInput, user: dict[str, Any] = Depends(get_current_user)):
+    _authorize_business(user, business_id)
+    try:
+        return await _service().create_business_profile(business_id, body.model_dump(mode="json", exclude_none=True))
     except AiPriseAPIError as exc:
         raise _api_error(exc)
 
 
 @router.post("/aiprise/businesses/{business_id}/verification")
-async def start_business_verification(
-    business_id: str,
-    body: BusinessVerificationInput,
-    user: dict[str, Any] = Depends(get_current_user),
-):
-    # The authenticated actor is recorded in the request context. The caller must
-    # be authorized for this business through the application's merchant RBAC layer.
-    # This starter repository does not contain the merchant ownership schema.
+async def start_business_verification(business_id: str, body: BusinessVerificationInput, user: dict[str, Any] = Depends(get_current_user)):
+    _authorize_business(user, business_id)
     try:
-        return await _service().start_business_verification(
-            business_id, body.model_dump(mode="json", exclude_none=True)
-        )
+        return await _service().start_business_verification(business_id, body.model_dump(mode="json", exclude_none=True))
     except AiPriseAPIError as exc:
         raise _api_error(exc)
 
 
 @router.get("/aiprise/cases/{case_id}")
-async def get_aiprise_case(
-    case_id: str,
-    user: dict[str, Any] = Depends(get_current_user),
-):
+async def get_aiprise_case(case_id: str, user: dict[str, Any] = Depends(get_current_user)):
     try:
         record = await AiPriseRepository().get_case(case_id, str(user["id"]))
     except Exception as exc:
@@ -125,18 +110,13 @@ def verify_aiprise_signature(raw_body: bytes, signature: str, secret: str) -> bo
     return hmac.compare_digest(expected, signature.strip().lower())
 
 
-async def _handle_aiprise_callback(
-    request: Request,
-    x_hmac_signature: str,
-):
+async def _handle_aiprise_callback(request: Request, x_hmac_signature: str):
     if not aiprise_settings.aiprise_webhook_secret:
         raise HTTPException(status_code=503, detail="AiPrise webhook verification is not configured")
     raw_body = await request.body()
     if len(raw_body) > aiprise_settings.aiprise_webhook_max_body_bytes:
         raise HTTPException(status_code=413, detail="Webhook payload too large")
-    if not verify_aiprise_signature(
-        raw_body, x_hmac_signature, aiprise_settings.aiprise_webhook_secret
-    ):
+    if not verify_aiprise_signature(raw_body, x_hmac_signature, aiprise_settings.aiprise_webhook_secret):
         raise HTTPException(status_code=401, detail="Invalid AiPrise webhook signature")
     try:
         payload = json.loads(raw_body)
@@ -145,22 +125,13 @@ async def _handle_aiprise_callback(
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Invalid AiPrise webhook payload")
 
-    event_type = str(
-        payload.get("event_type")
-        or payload.get("business_profile_event_type")
-        or "DECISION_CALLBACK"
-    )
+    event_type = str(payload.get("event_type") or payload.get("business_profile_event_type") or "DECISION_CALLBACK")
     session_id = payload.get("verification_session_id")
     client_reference_id = payload.get("client_reference_id")
-    event_id = payload.get("callback_event_id")
-    if not event_id:
-        # Some documented callback types do not include callback_event_id.
-        # Hash the exact signed bytes for deterministic duplicate suppression.
-        event_id = hashlib.sha256(raw_body).hexdigest()
+    event_id = payload.get("callback_event_id") or hashlib.sha256(raw_body).hexdigest()
     try:
         outcome = await AiPriseRepository().process_callback(
-            event_id=str(event_id),
-            event_type=event_type,
+            event_id=str(event_id), event_type=event_type,
             session_id=str(session_id) if session_id else None,
             client_reference_id=str(client_reference_id) if client_reference_id else None,
             payload=payload,
@@ -171,28 +142,18 @@ async def _handle_aiprise_callback(
 
 
 @router.post("/aiprise/callback", include_in_schema=False)
-async def aiprise_decision_callback(
-    request: Request,
-    x_hmac_signature: str = Header(default="", alias="X-HMAC-SIGNATURE"),
-):
+async def aiprise_decision_callback(request: Request, x_hmac_signature: str = Header(default="", alias="X-HMAC-SIGNATURE")):
     return await _handle_aiprise_callback(request, x_hmac_signature)
 
 
 @router.post("/aiprise/events", include_in_schema=False)
-async def aiprise_event_callback(
-    request: Request,
-    x_hmac_signature: str = Header(default="", alias="X-HMAC-SIGNATURE"),
-):
+async def aiprise_event_callback(request: Request, x_hmac_signature: str = Header(default="", alias="X-HMAC-SIGNATURE")):
     return await _handle_aiprise_callback(request, x_hmac_signature)
 
 
 @router.get("/muinmos/agents")
 async def get_muinmos_agent_catalog(_: dict[str, Any] = Depends(get_current_user)):
-    return {
-        "provider": "muinmos",
-        "live_connector": "contract_pending",
-        "agents": agent_catalog(),
-    }
+    return {"provider": "muinmos", "live_connector": "contract_pending", "agents": agent_catalog()}
 
 
 @router.get("/providers/status")
