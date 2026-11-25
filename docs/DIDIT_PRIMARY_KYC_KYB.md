@@ -44,6 +44,7 @@ DIDIT_KYC_WORKFLOW_ID=
 DIDIT_KYB_WORKFLOW_ID=
 DIDIT_CALLBACK_BASE_URL=https://api.everpayinc.com/v1
 DIDIT_BASE_URL=https://verification.didit.me
+SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 Use the **stable `workflow_id`**, not a version UUID. Configure the values for the correct Didit application/environment. Sandbox workflow IDs must not be used in production.
