@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS didit_verification_cases (
     workflow_id STRING(128) NOT NULL,
     didit_session_id STRING(128) NULL UNIQUE,
     verification_url STRING(2048) NULL,
-    callback_url STRING(2048) NULL,
     status STRING(32) NOT NULL,
     decision_summary JSONB NULL,
     last_event_at TIMESTAMPTZ NULL,
